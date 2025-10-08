@@ -657,20 +657,24 @@ namespace BililiveRecorder.Core
 
         private void DanmakuClient_StatusChanged(object? sender, Api.Danmaku.StatusChangedEventArgs e)
         {
-            this.DanmakuConnected = e.Connected;
-            if (e.Connected)
+            // 如果开启了自动录制
+            if (this.RoomConfig.AutoRecord)
             {
-                this.danmakuClientConnectTime = DateTimeOffset.UtcNow;
-                this.logger.Information("弹幕服务器已连接");
-            }
-            else
-            {
-                this.logger.Information("与弹幕服务器的连接被断开");
+                this.DanmakuConnected = e.Connected;
+                if (e.Connected)
+                {
+                    this.danmakuClientConnectTime = DateTimeOffset.UtcNow;
+                    this.logger.Information("弹幕服务器已连接");
+                }
+                else
+                {
+                    this.logger.Information("与弹幕服务器的连接被断开");
 
-                // 如果连接弹幕服务器的时间在至少 1 分钟之前，重连时不需要等待
-                // 针对偶尔的网络波动的优化，如果偶尔断开了尽快重连，减少漏录的弹幕量
-                this.StartDamakuConnection(delay: !((DateTimeOffset.UtcNow - this.danmakuClientConnectTime) > danmakuClientReconnectNoDelay));
-                this.danmakuClientConnectTime = DateTimeOffset.MaxValue;
+                    // 如果连接弹幕服务器的时间在至少 1 分钟之前，重连时不需要等待
+                    // 针对偶尔的网络波动的优化，如果偶尔断开了尽快重连，减少漏录的弹幕量
+                    this.StartDamakuConnection(delay: !((DateTimeOffset.UtcNow - this.danmakuClientConnectTime) > danmakuClientReconnectNoDelay));
+                    this.danmakuClientConnectTime = DateTimeOffset.MaxValue;
+                }
             }
         }
 
