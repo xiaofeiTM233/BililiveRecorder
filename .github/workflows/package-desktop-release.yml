@@ -259,7 +259,7 @@ jobs:
               $prTitle = "Release BililiveRecorder v$version"
               $prBody = "Release BililiveRecorder v$version`n`nSource: $env:SOURCE_RUN_URL"
               
-              gh pr create --title "$prTitle" --body "$prBody" --base main --head "$branchName"
+              gh pr create --title "$prTitle" --body "$prBody" --base master --head "$branchName"
               if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
             }
           } finally {
