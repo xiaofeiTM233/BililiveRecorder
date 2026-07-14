@@ -16,7 +16,7 @@
     <tb:TaskbarIcon 
         x:Name="TaskbarIcon" TrayLeftMouseUp="TaskbarIcon_TrayLeftMouseUp"
         Visibility="{Binding Recorder, Converter={StaticResource IsNullToVisibilityCollapsedConverter}}"
-        ToolTipText="{l:Loc TaskbarIconControl_Title}" MenuActivation="RightClick"
+        MenuActivation="RightClick"
         >
         <tb:TaskbarIcon.ContextMenu>
             <ContextMenu l:ResxLocalizationProvider.DefaultDictionary="Strings">

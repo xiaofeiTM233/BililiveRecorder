@@ -1,6 +1,7 @@
 using System;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Threading;
 
 namespace BililiveRecorder.WPF.Controls
 {
@@ -9,6 +10,9 @@ namespace BililiveRecorder.WPF.Controls
     /// </summary>
     public partial class TaskbarIconControl : UserControl
     {
+        private UIElement _originalToolTip;
+        private bool _toolTipResetting;
+
         public TaskbarIconControl()
         {
             this.InitializeComponent();
@@ -16,7 +20,8 @@ namespace BililiveRecorder.WPF.Controls
             using var iconStream = Application.GetResourceStream(new Uri("pack://application:,,,/BililiveRecorder.WPF;component/ico.ico")).Stream;
             this.TaskbarIcon.Icon = new System.Drawing.Icon(iconStream);
 
-            // AddHandler(NewMainWindow.ShowBalloonTipEvent, (RoutedEventHandler)UserControl_ShowBalloonTip);
+            this._originalToolTip = this.TaskbarIcon.TrayToolTip;
+
             if (Application.Current.MainWindow is NewMainWindow nmw)
             {
                 nmw.ShowBalloonTipCallback = (title, msg, sym) =>
@@ -24,11 +29,29 @@ namespace BililiveRecorder.WPF.Controls
                     this.TaskbarIcon.ShowBalloonTip(title, msg, sym);
                 };
             }
+
+            this.Loaded += OnLoaded;
+        }
+
+        private void OnLoaded(object sender, RoutedEventArgs e)
+        {
+            var window = Application.Current.MainWindow;
+            if (window != null)
+            {
+                window.Activated += OnMainWindowStateChanged;
+                window.Deactivated += OnMainWindowStateChanged;
+                window.LocationChanged += OnMainWindowStateChanged;
+            }
+        }
+
+        private void OnMainWindowStateChanged(object sender, EventArgs e)
+        {
+            ForceCloseToolTip();
         }
 
         private void TaskbarIcon_TrayLeftMouseUp(object sender, RoutedEventArgs e)
         {
-            // RaiseEvent(new RoutedEventArgs(NewMainWindow.SuperActivateEvent));
+            ForceCloseToolTip();
             (Application.Current.MainWindow as NewMainWindow)?.SuperActivateAction();
         }
 
@@ -42,12 +65,21 @@ namespace BililiveRecorder.WPF.Controls
             (Application.Current.MainWindow as NewMainWindow)?.CloseWithoutConfirmAction();
         }
 
-        /*
-        private void UserControl_ShowBalloonTip(object sender, RoutedEventArgs e)
+        internal void ForceCloseToolTip()
         {
-            var f = e as NewMainWindow.ShowBalloonTipRoutedEventArgs;
-            TaskbarIcon.ShowBalloonTip(f.Title, f.Message, f.Symbol);
+            if (_toolTipResetting || this.TaskbarIcon.TrayToolTip == null)
+                return;
+
+            _toolTipResetting = true;
+            this.TaskbarIcon.TrayToolTip = null;
+
+            this.Dispatcher.BeginInvoke(
+                DispatcherPriority.Background,
+                new Action(() =>
+                {
+                    this.TaskbarIcon.TrayToolTip = this._originalToolTip;
+                    _toolTipResetting = false;
+                }));
         }
-        */
     }
 }
