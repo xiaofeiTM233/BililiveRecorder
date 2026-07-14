@@ -15,7 +15,7 @@ namespace BililiveRecorder.WPF.Controls
         private POINT _lastTrayCursorPos;
         private DispatcherTimer _watchdogTimer;
 
-        private const double WatchdogTimeoutSeconds = 5.0;
+        private const double WatchdogTimeoutSeconds = 1.0;
         private const int WatchdogIntervalMs = 500;
         private const int CursorMovedThreshold = 120;
 
