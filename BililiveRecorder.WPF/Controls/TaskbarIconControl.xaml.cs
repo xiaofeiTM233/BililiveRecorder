@@ -1,17 +1,46 @@
 using System;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Interop;
 using System.Windows.Threading;
 
 namespace BililiveRecorder.WPF.Controls
 {
-    /// <summary>
-    /// Interaction logic for TaskbarIconControl.xaml
-    /// </summary>
     public partial class TaskbarIconControl : UserControl
     {
         private UIElement _originalToolTip;
         private bool _toolTipResetting;
+
+        [DllImport("user32.dll")]
+        private static extern bool GetCursorPos(out POINT lpPoint);
+
+        [DllImport("user32.dll")]
+        private static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
+
+        [DllImport("user32.dll")]
+        private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter,
+            int X, int Y, int cx, int cy, uint uFlags);
+
+        private const uint SWP_NOSIZE = 0x0001;
+        private const uint SWP_NOZORDER = 0x0004;
+        private const uint SWP_NOACTIVATE = 0x0010;
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct POINT
+        {
+            public int X;
+            public int Y;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct RECT
+        {
+            public int Left;
+            public int Top;
+            public int Right;
+            public int Bottom;
+        }
 
         public TaskbarIconControl()
         {
@@ -47,6 +76,46 @@ namespace BililiveRecorder.WPF.Controls
         private void OnMainWindowStateChanged(object sender, EventArgs e)
         {
             ForceCloseToolTip();
+        }
+
+        private void TaskbarIcon_PreviewTrayToolTipOpen(object sender, RoutedEventArgs e)
+        {
+            if (this.TaskbarIcon.TrayToolTip == null)
+                return;
+
+            this.Dispatcher.BeginInvoke(
+                DispatcherPriority.Background,
+                new Action(FixToolTipPosition));
+        }
+
+        private void FixToolTipPosition()
+        {
+            var tooltip = this.TaskbarIcon.TrayToolTip;
+            if (tooltip == null)
+                return;
+
+            try
+            {
+                var source = PresentationSource.FromVisual(tooltip) as HwndSource;
+                if (source == null || source.Handle == IntPtr.Zero)
+                    return;
+
+                if (!GetWindowRect(source.Handle, out RECT rect))
+                    return;
+
+                if (rect.Left > 5 || rect.Top > 5)
+                    return;
+
+                if (!GetCursorPos(out POINT cursorPos))
+                    return;
+
+                SetWindowPos(source.Handle, IntPtr.Zero,
+                    cursorPos.X + 10, cursorPos.Y + 20,
+                    0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+            }
+            catch
+            {
+            }
         }
 
         private void TaskbarIcon_TrayLeftMouseUp(object sender, RoutedEventArgs e)
