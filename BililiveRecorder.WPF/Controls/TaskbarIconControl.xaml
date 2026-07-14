@@ -18,6 +18,8 @@
         Visibility="{Binding Recorder, Converter={StaticResource IsNullToVisibilityCollapsedConverter}}"
         MenuActivation="RightClick"
         PreviewTrayToolTipOpen="TaskbarIcon_PreviewTrayToolTipOpen"
+        TrayToolTipClose="TaskbarIcon_TrayToolTipClose"
+        TrayMouseMove="TaskbarIcon_TrayMouseMove"
         >
         <tb:TaskbarIcon.ContextMenu>
             <ContextMenu l:ResxLocalizationProvider.DefaultDictionary="Strings">

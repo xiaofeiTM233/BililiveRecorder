@@ -11,6 +11,13 @@ namespace BililiveRecorder.WPF.Controls
     {
         private UIElement _originalToolTip;
         private bool _toolTipResetting;
+        private DateTime _lastTrayMouseMove = DateTime.MinValue;
+        private POINT _lastTrayCursorPos;
+        private DispatcherTimer _watchdogTimer;
+
+        private const double WatchdogTimeoutSeconds = 5.0;
+        private const int WatchdogIntervalMs = 500;
+        private const int CursorMovedThreshold = 120;
 
         [DllImport("user32.dll")]
         private static extern bool GetCursorPos(out POINT lpPoint);
@@ -78,14 +85,112 @@ namespace BililiveRecorder.WPF.Controls
             ForceCloseToolTip();
         }
 
+        private void TaskbarIcon_TrayMouseMove(object sender, RoutedEventArgs e)
+        {
+            _lastTrayMouseMove = DateTime.UtcNow;
+            GetCursorPos(out _lastTrayCursorPos);
+        }
+
         private void TaskbarIcon_PreviewTrayToolTipOpen(object sender, RoutedEventArgs e)
         {
             if (this.TaskbarIcon.TrayToolTip == null)
                 return;
 
+            _lastTrayMouseMove = DateTime.UtcNow;
+            GetCursorPos(out _lastTrayCursorPos);
+
             this.Dispatcher.BeginInvoke(
                 DispatcherPriority.Background,
                 new Action(FixToolTipPosition));
+
+            StartWatchdog();
+        }
+
+        private void TaskbarIcon_TrayToolTipClose(object sender, RoutedEventArgs e)
+        {
+            StopWatchdog();
+        }
+
+        private void StartWatchdog()
+        {
+            StopWatchdog();
+            _watchdogTimer = new DispatcherTimer(
+                TimeSpan.FromMilliseconds(WatchdogIntervalMs),
+                DispatcherPriority.Background,
+                OnWatchdogTick,
+                this.Dispatcher);
+            _watchdogTimer.Start();
+        }
+
+        private void StopWatchdog()
+        {
+            if (_watchdogTimer != null)
+            {
+                _watchdogTimer.Stop();
+                _watchdogTimer = null;
+            }
+        }
+
+        private void OnWatchdogTick(object sender, EventArgs e)
+        {
+            var tooltip = this.TaskbarIcon.TrayToolTip;
+            if (tooltip == null || !IsPopupVisible(tooltip))
+            {
+                StopWatchdog();
+                return;
+            }
+
+            var elapsed = (DateTime.UtcNow - _lastTrayMouseMove).TotalSeconds;
+            if (elapsed < WatchdogTimeoutSeconds)
+                return;
+
+            if (!GetCursorPos(out POINT cursorPos))
+                return;
+
+            var dx = Math.Abs(cursorPos.X - _lastTrayCursorPos.X);
+            var dy = Math.Abs(cursorPos.Y - _lastTrayCursorPos.Y);
+
+            if (CursorInsidePopup(cursorPos, tooltip))
+                return;
+
+            if (dx <= CursorMovedThreshold && dy <= CursorMovedThreshold)
+                return;
+
+            StopWatchdog();
+            ForceCloseToolTipUnsafe();
+        }
+
+        private bool IsPopupVisible(UIElement tooltip)
+        {
+            try
+            {
+                var source = PresentationSource.FromVisual(tooltip) as HwndSource;
+                return source != null && source.Handle != IntPtr.Zero;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private bool CursorInsidePopup(POINT cursorPos, UIElement tooltip)
+        {
+            try
+            {
+                var source = PresentationSource.FromVisual(tooltip) as HwndSource;
+                if (source == null || source.Handle == IntPtr.Zero)
+                    return false;
+
+                if (!GetWindowRect(source.Handle, out RECT rect))
+                    return false;
+
+                return cursorPos.X >= rect.Left && cursorPos.X <= rect.Right
+                    && cursorPos.Y >= rect.Top && cursorPos.Y <= rect.Bottom;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         private void FixToolTipPosition()
@@ -137,6 +242,16 @@ namespace BililiveRecorder.WPF.Controls
         internal void ForceCloseToolTip()
         {
             if (_toolTipResetting || this.TaskbarIcon.TrayToolTip == null)
+                return;
+
+            ForceCloseToolTipUnsafe();
+        }
+
+        private void ForceCloseToolTipUnsafe()
+        {
+            StopWatchdog();
+
+            if (this.TaskbarIcon.TrayToolTip == null)
                 return;
 
             _toolTipResetting = true;
