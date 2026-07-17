@@ -255,15 +255,11 @@ namespace BililiveRecorder.WPF.Controls
                 return;
 
             _toolTipResetting = true;
-            this.TaskbarIcon.TrayToolTip = null;
 
-            this.Dispatcher.BeginInvoke(
-                DispatcherPriority.Background,
-                new Action(() =>
-                {
-                    this.TaskbarIcon.TrayToolTip = this._originalToolTip;
-                    _toolTipResetting = false;
-                }));
+            var original = this._originalToolTip;
+            this.TaskbarIcon.TrayToolTip = original;
+
+            _toolTipResetting = false;
         }
     }
 }
