@@ -3,6 +3,7 @@ using System.Runtime.Serialization;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Data;
 using BililiveRecorder.Core.Api;
 using BililiveRecorder.Core.Scripting;
 using Newtonsoft.Json.Linq;
@@ -55,6 +56,7 @@ namespace BililiveRecorder.WPF.Pages
         {
             try
             {
+                this.CookieTextBox.GetBindingExpression(System.Windows.Controls.TextBox.TextProperty)?.UpdateSource();
                 await this.TestCookieAsync().ConfigureAwait(false);
             }
             catch (Exception ex)
