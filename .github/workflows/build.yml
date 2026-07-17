@@ -37,9 +37,9 @@ jobs:
         run: ./webui/build.sh
 
       - name: Run Tests - Debug
-        run: dotnet test -v m -c Debug
+        run: dotnet test -v m -c Debug -f net8.0
       - name: Run Tests - Release
-        run: dotnet test -v m -c Release
+        run: dotnet test -v m -c Release -f net8.0
 
   build_wpf:
     # Tests can be run parallelly for debug builds to save time
