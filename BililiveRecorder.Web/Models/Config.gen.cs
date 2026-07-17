@@ -24,6 +24,7 @@ namespace BililiveRecorder.Web.Models
         public Optional<bool>? OptionalRecordDanmakuGuard { get; set; }
         public Optional<bool>? OptionalRecordDanmakuKeepConnected { get; set; }
         public Optional<bool>? OptionalSaveStreamCover { get; set; }
+        public Optional<string?>? OptionalRecordingQuality { get; set; }
         public Optional<bool>? OptionalFlvProcessorSplitOnScriptTag { get; set; }
         public Optional<bool>? OptionalFlvProcessorDisableSplitOnH264AnnexB { get; set; }
         public Optional<string?>? OptionalTitleFilterPatterns { get; set; }
