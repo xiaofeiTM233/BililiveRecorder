@@ -34,8 +34,12 @@ jobs:
         run: ./webui/build.sh
 
       - name: Run Tests - Debug
+        env:
+          GITVERSION_DISABLE_BUILD_SERVERS: true
         run: dotnet test -v m -c Debug
       - name: Run Tests - Release
+        env:
+          GITVERSION_DISABLE_BUILD_SERVERS: true
         run: dotnet test -v m -c Release
 
   release_wpf:
