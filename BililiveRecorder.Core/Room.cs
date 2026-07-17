@@ -406,7 +406,7 @@ namespace BililiveRecorder.Core
                 if (this.disposedValue)
                     return;
 
-                if (!this.RoomConfig.AutoRecord && !this.Recording)
+                if (!this.Recording && !(this.RoomConfig.AutoRecord && this.RoomConfig.RecordDanmakuKeepConnected))
                 {
                     this.logger.Debug("未开启自动录制且当前未在录制中，跳过连接弹幕服务器");
                     return;
@@ -603,7 +603,7 @@ namespace BililiveRecorder.Core
             this.OnPropertyChanged(nameof(this.Recording));
             this.Stats.Reset();
 
-            if (!this.RoomConfig.AutoRecord && !this.Recording)
+            if (!this.Recording && !(this.RoomConfig.AutoRecord && this.RoomConfig.RecordDanmakuKeepConnected))
             {
                 _ = Task.Run(async () =>
                 {

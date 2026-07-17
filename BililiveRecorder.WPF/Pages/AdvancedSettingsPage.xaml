@@ -163,7 +163,7 @@
              如您知晓您的账号会因以上所列出来的部分原因所导致无法使用或权益受损等情况，并愿意承担由此所会带来的一系列后果，请继续以下的操作，软件开发者不会对您账号所发生的任何后果承担责任。<LineBreak/>
                     </TextBlock>
                     <c:SettingWithDefault IsSettingNotUsingDefault="{Binding HasCookie}">
-                        <TextBox x:Name="CookieTextBox" Text="{Binding Cookie,UpdateSourceTrigger=PropertyChanged,Delay=1000}" Width="220" HorizontalAlignment="Left"/>
+                        <TextBox Text="{Binding Cookie,UpdateSourceTrigger=PropertyChanged,Delay=1000}" Width="220" HorizontalAlignment="Left"/>
                     </c:SettingWithDefault>
                     <Button Content="Test" Click="TestCookie_Click"/>
                 </StackPanel>
