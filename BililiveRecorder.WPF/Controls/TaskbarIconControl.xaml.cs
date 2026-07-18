@@ -12,12 +12,10 @@ namespace BililiveRecorder.WPF.Controls
         private UIElement _originalToolTip;
         private bool _toolTipResetting;
         private DateTime _lastTrayMouseMove = DateTime.MinValue;
-        private POINT _lastTrayCursorPos;
         private DispatcherTimer _watchdogTimer;
 
         private const double WatchdogTimeoutSeconds = 1.0;
         private const int WatchdogIntervalMs = 500;
-        private const int CursorMovedThreshold = 120;
 
         [DllImport("user32.dll")]
         private static extern bool GetCursorPos(out POINT lpPoint);
@@ -88,7 +86,6 @@ namespace BililiveRecorder.WPF.Controls
         private void TaskbarIcon_TrayMouseMove(object sender, RoutedEventArgs e)
         {
             _lastTrayMouseMove = DateTime.UtcNow;
-            GetCursorPos(out _lastTrayCursorPos);
         }
 
         private void TaskbarIcon_PreviewTrayToolTipOpen(object sender, RoutedEventArgs e)
@@ -97,7 +94,6 @@ namespace BililiveRecorder.WPF.Controls
                 return;
 
             _lastTrayMouseMove = DateTime.UtcNow;
-            GetCursorPos(out _lastTrayCursorPos);
 
             this.Dispatcher.BeginInvoke(
                 DispatcherPriority.Background,
@@ -134,42 +130,30 @@ namespace BililiveRecorder.WPF.Controls
         private void OnWatchdogTick(object sender, EventArgs e)
         {
             var tooltip = this.TaskbarIcon.TrayToolTip;
-            if (tooltip == null || !IsPopupVisible(tooltip))
+            if (tooltip == null)
             {
                 StopWatchdog();
                 return;
             }
 
-            var elapsed = (DateTime.UtcNow - _lastTrayMouseMove).TotalSeconds;
-            if (elapsed < WatchdogTimeoutSeconds)
-                return;
-
             if (!GetCursorPos(out POINT cursorPos))
+            {
+                StopWatchdog();
+                ForceCloseToolTipUnsafe();
                 return;
-
-            var dx = Math.Abs(cursorPos.X - _lastTrayCursorPos.X);
-            var dy = Math.Abs(cursorPos.Y - _lastTrayCursorPos.Y);
+            }
 
             if (CursorInsidePopup(cursorPos, tooltip))
-                return;
-
-            if (dx <= CursorMovedThreshold && dy <= CursorMovedThreshold)
-                return;
-
-            StopWatchdog();
-            ForceCloseToolTipUnsafe();
-        }
-
-        private bool IsPopupVisible(UIElement tooltip)
-        {
-            try
             {
-                var source = PresentationSource.FromVisual(tooltip) as HwndSource;
-                return source != null && source.Handle != IntPtr.Zero;
+                _lastTrayMouseMove = DateTime.UtcNow;
+                return;
             }
-            catch
+
+            var elapsed = (DateTime.UtcNow - _lastTrayMouseMove).TotalSeconds;
+            if (elapsed >= WatchdogTimeoutSeconds)
             {
-                return false;
+                StopWatchdog();
+                ForceCloseToolTipUnsafe();
             }
         }
 
