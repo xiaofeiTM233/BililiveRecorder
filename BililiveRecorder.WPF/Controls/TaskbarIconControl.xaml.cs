@@ -9,8 +9,6 @@ namespace BililiveRecorder.WPF.Controls
 {
     public partial class TaskbarIconControl : UserControl
     {
-        private UIElement _originalToolTip;
-        private bool _toolTipResetting;
         private DateTime _lastTrayMouseMove = DateTime.MinValue;
         private DispatcherTimer _watchdogTimer;
 
@@ -27,9 +25,14 @@ namespace BililiveRecorder.WPF.Controls
         private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter,
             int X, int Y, int cx, int cy, uint uFlags);
 
+        [DllImport("user32.dll")]
+        private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
         private const uint SWP_NOSIZE = 0x0001;
         private const uint SWP_NOZORDER = 0x0004;
         private const uint SWP_NOACTIVATE = 0x0010;
+
+        private const int SW_HIDE = 0;
 
         [StructLayout(LayoutKind.Sequential)]
         private struct POINT
@@ -53,8 +56,6 @@ namespace BililiveRecorder.WPF.Controls
 
             using var iconStream = Application.GetResourceStream(new Uri("pack://application:,,,/BililiveRecorder.WPF;component/ico.ico")).Stream;
             this.TaskbarIcon.Icon = new System.Drawing.Icon(iconStream);
-
-            this._originalToolTip = this.TaskbarIcon.TrayToolTip;
 
             if (Application.Current.MainWindow is NewMainWindow nmw)
             {
@@ -139,7 +140,7 @@ namespace BililiveRecorder.WPF.Controls
             if (!GetCursorPos(out POINT cursorPos))
             {
                 StopWatchdog();
-                ForceCloseToolTipUnsafe();
+                ForceCloseToolTip();
                 return;
             }
 
@@ -153,7 +154,7 @@ namespace BililiveRecorder.WPF.Controls
             if (elapsed >= WatchdogTimeoutSeconds)
             {
                 StopWatchdog();
-                ForceCloseToolTipUnsafe();
+                ForceCloseToolTip();
             }
         }
 
@@ -225,25 +226,21 @@ namespace BililiveRecorder.WPF.Controls
 
         internal void ForceCloseToolTip()
         {
-            if (_toolTipResetting || this.TaskbarIcon.TrayToolTip == null)
-                return;
-
-            ForceCloseToolTipUnsafe();
-        }
-
-        private void ForceCloseToolTipUnsafe()
-        {
             StopWatchdog();
 
-            if (this.TaskbarIcon.TrayToolTip == null)
+            var tooltip = this.TaskbarIcon.TrayToolTip;
+            if (tooltip == null)
                 return;
 
-            _toolTipResetting = true;
-
-            var original = this._originalToolTip;
-            this.TaskbarIcon.TrayToolTip = original;
-
-            _toolTipResetting = false;
+            try
+            {
+                var source = PresentationSource.FromVisual(tooltip) as HwndSource;
+                if (source != null && source.Handle != IntPtr.Zero)
+                    ShowWindow(source.Handle, SW_HIDE);
+            }
+            catch
+            {
+            }
         }
     }
 }
