@@ -12,12 +12,10 @@ namespace BililiveRecorder.WPF.Controls
         private UIElement _originalToolTip;
         private bool _toolTipResetting;
         private DateTime _lastTrayMouseMove = DateTime.MinValue;
-        private POINT _lastTrayCursorPos;
         private DispatcherTimer _watchdogTimer;
 
         private const double WatchdogTimeoutSeconds = 1.0;
         private const int WatchdogIntervalMs = 500;
-        private const int CursorMovedThreshold = 120;
 
         [DllImport("user32.dll")]
         private static extern bool GetCursorPos(out POINT lpPoint);
@@ -88,7 +86,6 @@ namespace BililiveRecorder.WPF.Controls
         private void TaskbarIcon_TrayMouseMove(object sender, RoutedEventArgs e)
         {
             _lastTrayMouseMove = DateTime.UtcNow;
-            GetCursorPos(out _lastTrayCursorPos);
         }
 
         private void TaskbarIcon_PreviewTrayToolTipOpen(object sender, RoutedEventArgs e)
@@ -97,7 +94,6 @@ namespace BililiveRecorder.WPF.Controls
                 return;
 
             _lastTrayMouseMove = DateTime.UtcNow;
-            GetCursorPos(out _lastTrayCursorPos);
 
             this.Dispatcher.BeginInvoke(
                 DispatcherPriority.Background,
@@ -134,62 +130,23 @@ namespace BililiveRecorder.WPF.Controls
         private void OnWatchdogTick(object sender, EventArgs e)
         {
             var tooltip = this.TaskbarIcon.TrayToolTip;
-            if (tooltip == null || !IsPopupVisible(tooltip))
+            if (tooltip == null)
             {
                 StopWatchdog();
                 return;
             }
 
+            if (tooltip is UIElement fe && fe.IsMouseOver)
+            {
+                _lastTrayMouseMove = DateTime.UtcNow;
+                return;
+            }
+
             var elapsed = (DateTime.UtcNow - _lastTrayMouseMove).TotalSeconds;
-            if (elapsed < WatchdogTimeoutSeconds)
-                return;
-
-            if (!GetCursorPos(out POINT cursorPos))
-                return;
-
-            var dx = Math.Abs(cursorPos.X - _lastTrayCursorPos.X);
-            var dy = Math.Abs(cursorPos.Y - _lastTrayCursorPos.Y);
-
-            if (CursorInsidePopup(cursorPos, tooltip))
-                return;
-
-            if (dx <= CursorMovedThreshold && dy <= CursorMovedThreshold)
-                return;
-
-            StopWatchdog();
-            ForceCloseToolTipUnsafe();
-        }
-
-        private bool IsPopupVisible(UIElement tooltip)
-        {
-            try
+            if (elapsed >= WatchdogTimeoutSeconds)
             {
-                var source = PresentationSource.FromVisual(tooltip) as HwndSource;
-                return source != null && source.Handle != IntPtr.Zero;
-            }
-            catch
-            {
-                return false;
-            }
-        }
-
-        private bool CursorInsidePopup(POINT cursorPos, UIElement tooltip)
-        {
-            try
-            {
-                var source = PresentationSource.FromVisual(tooltip) as HwndSource;
-                if (source == null || source.Handle == IntPtr.Zero)
-                    return false;
-
-                if (!GetWindowRect(source.Handle, out RECT rect))
-                    return false;
-
-                return cursorPos.X >= rect.Left && cursorPos.X <= rect.Right
-                    && cursorPos.Y >= rect.Top && cursorPos.Y <= rect.Bottom;
-            }
-            catch
-            {
-                return false;
+                StopWatchdog();
+                ForceCloseToolTip();
             }
         }
 
@@ -256,8 +213,20 @@ namespace BililiveRecorder.WPF.Controls
 
             _toolTipResetting = true;
 
-            var original = this._originalToolTip;
-            this.TaskbarIcon.TrayToolTip = original;
+            try
+            {
+                var popupField = typeof(Hardcodet.Wpf.TaskbarNotification.TaskbarIcon)
+                    .GetField("customToolTipParent", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                var popup = popupField?.GetValue(this.TaskbarIcon) as System.Windows.Controls.Primitives.Popup;
+                if (popup != null)
+                {
+                    popup.PopupAnimation = System.Windows.Controls.Primitives.PopupAnimation.None;
+                    popup.IsOpen = false;
+                }
+            }
+            catch
+            {
+            }
 
             _toolTipResetting = false;
         }
