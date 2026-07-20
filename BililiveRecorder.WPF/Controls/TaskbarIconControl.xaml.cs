@@ -11,7 +11,6 @@ namespace BililiveRecorder.WPF.Controls
     {
         private UIElement _originalToolTip;
         private bool _toolTipResetting;
-        private bool _mouseInToolTip;
         private DateTime _lastTrayMouseMove = DateTime.MinValue;
         private DispatcherTimer _watchdogTimer;
 
@@ -96,12 +95,6 @@ namespace BililiveRecorder.WPF.Controls
 
             _lastTrayMouseMove = DateTime.UtcNow;
 
-            if (this.TaskbarIcon.TrayToolTip is FrameworkElement fe)
-            {
-                fe.MouseEnter += OnToolTipMouseEnter;
-                fe.MouseLeave += OnToolTipMouseLeave;
-            }
-
             this.Dispatcher.BeginInvoke(
                 DispatcherPriority.Background,
                 new Action(FixToolTipPosition));
@@ -109,24 +102,8 @@ namespace BililiveRecorder.WPF.Controls
             StartWatchdog();
         }
 
-        private void OnToolTipMouseEnter(object sender, System.Windows.Input.MouseEventArgs e)
-        {
-            _mouseInToolTip = true;
-        }
-
-        private void OnToolTipMouseLeave(object sender, System.Windows.Input.MouseEventArgs e)
-        {
-            _mouseInToolTip = false;
-            _lastTrayMouseMove = DateTime.UtcNow;
-        }
-
         private void TaskbarIcon_TrayToolTipClose(object sender, RoutedEventArgs e)
         {
-            if (this.TaskbarIcon.TrayToolTip is FrameworkElement fe)
-            {
-                fe.MouseEnter -= OnToolTipMouseEnter;
-                fe.MouseLeave -= OnToolTipMouseLeave;
-            }
             StopWatchdog();
         }
 
@@ -159,7 +136,7 @@ namespace BililiveRecorder.WPF.Controls
                 return;
             }
 
-            if (_mouseInToolTip)
+            if (tooltip is UIElement fe && fe.IsMouseOver)
             {
                 _lastTrayMouseMove = DateTime.UtcNow;
                 return;
