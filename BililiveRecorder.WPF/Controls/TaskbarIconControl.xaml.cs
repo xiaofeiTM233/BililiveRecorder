@@ -27,14 +27,9 @@ namespace BililiveRecorder.WPF.Controls
         private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter,
             int X, int Y, int cx, int cy, uint uFlags);
 
-        [DllImport("user32.dll")]
-        private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
-
         private const uint SWP_NOSIZE = 0x0001;
         private const uint SWP_NOZORDER = 0x0004;
         private const uint SWP_NOACTIVATE = 0x0010;
-
-        private const int SW_HIDE = 0;
 
         [StructLayout(LayoutKind.Sequential)]
         private struct POINT
@@ -247,9 +242,11 @@ namespace BililiveRecorder.WPF.Controls
 
             try
             {
-                var source = PresentationSource.FromVisual(this.TaskbarIcon.TrayToolTip) as HwndSource;
-                if (source != null && source.Handle != IntPtr.Zero)
-                    ShowWindow(source.Handle, SW_HIDE);
+                var popupField = typeof(Hardcodet.Wpf.TaskbarNotification.TaskbarIcon)
+                    .GetField("customToolTipParent", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                var popup = popupField?.GetValue(this.TaskbarIcon) as System.Windows.Controls.Primitives.Popup;
+                if (popup != null)
+                    popup.IsOpen = false;
             }
             catch
             {
