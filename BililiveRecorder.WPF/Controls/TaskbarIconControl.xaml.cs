@@ -11,6 +11,7 @@ namespace BililiveRecorder.WPF.Controls
     {
         private UIElement _originalToolTip;
         private bool _toolTipResetting;
+        private bool _mouseInToolTip;
         private DateTime _lastTrayMouseMove = DateTime.MinValue;
         private DispatcherTimer _watchdogTimer;
 
@@ -95,6 +96,12 @@ namespace BililiveRecorder.WPF.Controls
 
             _lastTrayMouseMove = DateTime.UtcNow;
 
+            if (this.TaskbarIcon.TrayToolTip is FrameworkElement fe)
+            {
+                fe.MouseEnter += OnToolTipMouseEnter;
+                fe.MouseLeave += OnToolTipMouseLeave;
+            }
+
             this.Dispatcher.BeginInvoke(
                 DispatcherPriority.Background,
                 new Action(FixToolTipPosition));
@@ -102,8 +109,24 @@ namespace BililiveRecorder.WPF.Controls
             StartWatchdog();
         }
 
+        private void OnToolTipMouseEnter(object sender, System.Windows.Input.MouseEventArgs e)
+        {
+            _mouseInToolTip = true;
+        }
+
+        private void OnToolTipMouseLeave(object sender, System.Windows.Input.MouseEventArgs e)
+        {
+            _mouseInToolTip = false;
+            _lastTrayMouseMove = DateTime.UtcNow;
+        }
+
         private void TaskbarIcon_TrayToolTipClose(object sender, RoutedEventArgs e)
         {
+            if (this.TaskbarIcon.TrayToolTip is FrameworkElement fe)
+            {
+                fe.MouseEnter -= OnToolTipMouseEnter;
+                fe.MouseLeave -= OnToolTipMouseLeave;
+            }
             StopWatchdog();
         }
 
@@ -136,14 +159,7 @@ namespace BililiveRecorder.WPF.Controls
                 return;
             }
 
-            if (!GetCursorPos(out POINT cursorPos))
-            {
-                StopWatchdog();
-                ForceCloseToolTip();
-                return;
-            }
-
-            if (CursorInsidePopup(cursorPos, tooltip))
+            if (_mouseInToolTip)
             {
                 _lastTrayMouseMove = DateTime.UtcNow;
                 return;
@@ -154,26 +170,6 @@ namespace BililiveRecorder.WPF.Controls
             {
                 StopWatchdog();
                 ForceCloseToolTip();
-            }
-        }
-
-        private bool CursorInsidePopup(POINT cursorPos, UIElement tooltip)
-        {
-            try
-            {
-                var source = PresentationSource.FromVisual(tooltip) as HwndSource;
-                if (source == null || source.Handle == IntPtr.Zero)
-                    return false;
-
-                if (!GetWindowRect(source.Handle, out RECT rect))
-                    return false;
-
-                return cursorPos.X >= rect.Left && cursorPos.X <= rect.Right
-                    && cursorPos.Y >= rect.Top && cursorPos.Y <= rect.Bottom;
-            }
-            catch
-            {
-                return false;
             }
         }
 
@@ -246,7 +242,10 @@ namespace BililiveRecorder.WPF.Controls
                     .GetField("customToolTipParent", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
                 var popup = popupField?.GetValue(this.TaskbarIcon) as System.Windows.Controls.Primitives.Popup;
                 if (popup != null)
+                {
+                    popup.PopupAnimation = System.Windows.Controls.Primitives.PopupAnimation.None;
                     popup.IsOpen = false;
+                }
             }
             catch
             {
