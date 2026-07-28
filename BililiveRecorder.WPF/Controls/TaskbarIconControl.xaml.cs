@@ -90,6 +90,9 @@ namespace BililiveRecorder.WPF.Controls
 
         private void TaskbarIcon_PreviewTrayToolTipOpen(object sender, RoutedEventArgs e)
         {
+            if (this.TaskbarIcon.TrayToolTip == null && this._originalToolTip != null)
+                this.TaskbarIcon.TrayToolTip = this._originalToolTip;
+
             if (this.TaskbarIcon.TrayToolTip == null)
                 return;
 
@@ -105,6 +108,7 @@ namespace BililiveRecorder.WPF.Controls
         private void TaskbarIcon_TrayToolTipClose(object sender, RoutedEventArgs e)
         {
             StopWatchdog();
+            this.TaskbarIcon.TrayToolTip = null;
         }
 
         private void StartWatchdog()
