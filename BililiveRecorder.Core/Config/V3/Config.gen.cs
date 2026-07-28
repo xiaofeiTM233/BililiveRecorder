@@ -180,6 +180,11 @@ namespace BililiveRecorder.Core.Config.V3
         public bool WpfNotifyStreamStart => this.GetPropertyValue<bool>();
 
         /// <summary>
+        /// 桌面版关闭托盘图标悬浮提示
+        /// </summary>
+        public bool WpfDisableTrayToolTip => this.GetPropertyValue<bool>();
+
+        /// <summary>
         /// Cookie
         /// </summary>
         public string? Cookie => this.GetPropertyValue<string>();
@@ -428,6 +433,14 @@ namespace BililiveRecorder.Core.Config.V3
         public Optional<bool> OptionalWpfNotifyStreamStart { get => this.GetPropertyValueOptional<bool>(nameof(this.WpfNotifyStreamStart)); set => this.SetPropertyValueOptional(value, nameof(this.WpfNotifyStreamStart)); }
 
         /// <summary>
+        /// 桌面版关闭托盘图标悬浮提示
+        /// </summary>
+        public bool WpfDisableTrayToolTip { get => this.GetPropertyValue<bool>(); set => this.SetPropertyValue(value); }
+        public bool HasWpfDisableTrayToolTip { get => this.GetPropertyHasValue(nameof(this.WpfDisableTrayToolTip)); set => this.SetPropertyHasValue<bool>(value, nameof(this.WpfDisableTrayToolTip)); }
+        [JsonProperty(nameof(WpfDisableTrayToolTip)), EditorBrowsable(EditorBrowsableState.Never)]
+        public Optional<bool> OptionalWpfDisableTrayToolTip { get => this.GetPropertyValueOptional<bool>(nameof(this.WpfDisableTrayToolTip)); set => this.SetPropertyValueOptional(value, nameof(this.WpfDisableTrayToolTip)); }
+
+        /// <summary>
         /// Cookie
         /// </summary>
         public string? Cookie { get => this.GetPropertyValue<string>(); set => this.SetPropertyValue(value); }
@@ -552,7 +565,7 @@ namespace BililiveRecorder.Core.Config.V3
     public sealed partial class DefaultConfig
     {
         public static readonly DefaultConfig Instance = new DefaultConfig();
-        private DefaultConfig() { }
+        private DefaultConfig() {}
 
         public RecordMode RecordMode => RecordMode.Standard;
 
@@ -595,6 +608,8 @@ namespace BililiveRecorder.Core.Config.V3
         public bool WpfShowTitleAndArea => true;
 
         public bool WpfNotifyStreamStart => false;
+
+        public bool WpfDisableTrayToolTip => false;
 
         public string Cookie => @"";
 
