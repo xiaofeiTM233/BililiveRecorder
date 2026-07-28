@@ -90,6 +90,9 @@ namespace BililiveRecorder.WPF.Controls
 
         private void TaskbarIcon_PreviewTrayToolTipOpen(object sender, RoutedEventArgs e)
         {
+            if (IsToolTipDisabled())
+                return;
+
             if (this.TaskbarIcon.TrayToolTip == null && this._originalToolTip != null)
                 this.TaskbarIcon.TrayToolTip = this._originalToolTip;
 
@@ -198,6 +201,12 @@ namespace BililiveRecorder.WPF.Controls
         private void MenuItem_Quit_Click(object sender, RoutedEventArgs e)
         {
             (Application.Current.MainWindow as NewMainWindow)?.CloseWithoutConfirmAction();
+        }
+
+        private bool IsToolTipDisabled()
+        {
+            return this.DataContext is Models.RootModel model
+                && model.Recorder?.Config?.Global?.WpfDisableTrayToolTip == true;
         }
 
         internal void ForceCloseToolTip()
