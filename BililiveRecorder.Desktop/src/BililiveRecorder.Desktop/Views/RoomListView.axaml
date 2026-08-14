@@ -1,0 +1,188 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:app="using:BililiveRecorder.Desktop.Converters"
+             xmlns:vm="using:BililiveRecorder.Desktop.ViewModels"
+             x:Class="BililiveRecorder.Desktop.Views.RoomListView"
+             x:DataType="vm:RoomListViewModel">
+
+    <UserControl.Styles>
+        <Style Selector="Border.roomCard">
+            <Setter Property="Background" Value="#12808080" />
+            <Setter Property="BorderBrush" Value="#26808080" />
+        </Style>
+        <Style Selector="Border.roomCard:pointerover">
+            <Setter Property="Background" Value="#24808080" />
+        </Style>
+    </UserControl.Styles>
+
+    <Grid RowDefinitions="Auto,*,Auto">
+
+        <!-- 顶部工具栏：添加房间 + 批量操作 + 更多菜单 -->
+        <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto,Auto,Auto" Margin="0,0,0,8">
+            <TextBox x:Name="AddRoomBox"
+                     Grid.Column="0"
+                     Watermark="{Binding Loc[AddRoomCard_PlaceholderText]}"
+                     Text="{Binding AddRoomInput, Mode=TwoWay}" />
+            <Button Grid.Column="1"
+                    Margin="8,0,0,0"
+                    Content="{Binding Loc[AddRoomCard_ConfirmButton]}"
+                    Command="{Binding AddRoomCommand}" />
+            <Button Grid.Column="2"
+                    Margin="8,0,0,0"
+                    Content="{Binding Loc[RoomListPage_Menu_AutoRecord_EnableAll]}"
+                    Command="{Binding EnableAutoRecordAllCommand}" />
+            <Button Grid.Column="3"
+                    Margin="8,0,0,0"
+                    Content="{Binding Loc[RoomListPage_Menu_AutoRecord_DisableAll]}"
+                    Command="{Binding DisableAutoRecordAllCommand}" />
+            <Button Grid.Column="4"
+                    x:Name="MoreButton"
+                    Margin="8,0,0,0"
+                    Content="☰">
+                <Button.Flyout>
+                    <MenuFlyout x:CompileBindings="False" Placement="BottomEdgeAlignedRight">
+                        <MenuItem Header="{Binding Loc[RoomListPage_Menu_Sort_Default]}" Click="Sort_Click" Tag="None" />
+                        <MenuItem Header="{Binding Loc[RoomListPage_Menu_Sort_RoomId]}" Click="Sort_Click" Tag="RoomId" />
+                        <MenuItem Header="{Binding Loc[RoomListPage_Menu_Sort_Status]}" Click="Sort_Click" Tag="Status" />
+                        <Separator />
+                        <MenuItem Header="{Binding Loc[RoomListPage_Menu_View_ShowTitleAndAreaCheckBox]}"
+                                  Command="{Binding UiSettings.ToggleShowTitleAndAreaCommand}" />
+                        <MenuItem Header="{Binding Loc[RoomListPage_Menu_View_NotifyStreamStart]}"
+                                  Command="{Binding UiSettings.ToggleNotifyStreamStartCommand}" />
+                        <Separator />
+                        <MenuItem Header="{Binding Loc[RoomListPage_Menu_File_SaveConfig]}" Command="{Binding SaveConfigCommand}" />
+                        <MenuItem Header="{Binding Loc[RoomListPage_Menu_File_OpenWorkDirectory]}" Click="OpenWorkDirectory_Click" />
+                        <MenuItem Header="{Binding Loc[RoomListPage_Menu_File_ShowLogFilesInExplorer]}" Click="OpenLogFolder_Click" />
+                        <MenuItem Header="{Binding Loc[RoomListPage_Menu_RefreshAllRoomInfo]}" Click="RefreshAll_Click" />
+                        <MenuItem Header="{Binding Loc[RoomListPage_Menu_File_ChangeWorkPath]}" Click="ChangeWorkPath_Click" />
+                    </MenuFlyout>
+                </Button.Flyout>
+            </Button>
+        </Grid>
+
+        <!-- 房间卡片墙：等价于 WPF 版的 ItemsRepeater + UniformGridLayout（MinItemWidth=230 的自动换行网格） -->
+        <ScrollViewer Grid.Row="1"
+                      HorizontalScrollBarVisibility="Disabled"
+                      VerticalScrollBarVisibility="Auto"
+                      Margin="0,0,4,0">
+            <ItemsControl x:Name="RoomItems" ItemsSource="{Binding Rooms}">
+                <ItemsControl.ItemsPanel>
+                    <!-- 单列纵向排列会把卡片拉成整宽的"列表"，自动换行才是卡片墙 -->
+                    <ItemsPanelTemplate>
+                        <WrapPanel />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:RoomListItemViewModel">
+                        <!-- 右键由 PointerPressed 自己处理（见 Card_PointerPressed）：
+                             Avalonia 内置的 ContextMenu/ContextFlyout 只在右键命中的正是控件本身时才会弹出
+                             （Control.OnPointerReleased 里的 e.Source == this 判断），点在标题文字上不会触发。 -->
+                        <Border Classes="roomCard"
+                                Width="230"
+                                MinHeight="100"
+                                Padding="10,8"
+                                CornerRadius="8"
+                                BorderThickness="1"
+                                Margin="0,0,8,8"
+                                PointerPressed="Card_PointerPressed">
+
+                            <Grid RowDefinitions="Auto,Auto,Auto,24">
+
+                                <!-- 第一行：主播名 + 溢出菜单按钮 -->
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <TextBlock Text="{Binding Name}"
+                                               FontSize="15"
+                                               FontWeight="SemiBold"
+                                               VerticalAlignment="Center"
+                                               TextTrimming="CharacterEllipsis"
+                                               ToolTip.Tip="{Binding Name}" />
+                                    <Button Grid.Column="1"
+                                            Click="CardMoreButton_Click"
+                                            Content="⋮"
+                                            Padding="6,0"
+                                            FontSize="14"
+                                            Background="Transparent"
+                                            BorderThickness="0"
+                                            VerticalAlignment="Center"
+                                            ToolTip.Tip="{Binding Loc[RoomCard_Menu_Tooltip]}" />
+                                </Grid>
+
+                                <!-- 第二行：标题 -->
+                                <TextBlock Grid.Row="1"
+                                           Text="{Binding Title}"
+                                           TextTrimming="CharacterEllipsis"
+                                           Opacity="0.85"
+                                           IsVisible="{Binding UiSettings.ShowTitleAndArea}" />
+
+                                <!-- 第三行：分区 + 房间号 -->
+                                <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8" IsVisible="{Binding UiSettings.ShowTitleAndArea}">
+                                    <TextBlock Text="{Binding AreaText}"
+                                               FontSize="12"
+                                               Opacity="0.55"
+                                               VerticalAlignment="Center" />
+                                    <TextBlock Text="{Binding RoomId, StringFormat=#{0}}"
+                                               FontSize="11"
+                                               Opacity="0.5"
+                                               VerticalAlignment="Center" />
+                                    <TextBlock Text="{Binding ShortId, StringFormat={}{0}}"
+                                               FontSize="11"
+                                               Opacity="0.5"
+                                               VerticalAlignment="Center"
+                                               IsVisible="{Binding ShortId, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                                    <TextBlock Text="⚠"
+                                               FontSize="11"
+                                               Foreground="DarkOrange"
+                                               VerticalAlignment="Center"
+                                               IsVisible="{Binding !AutoRecordForThisSession}"
+                                               ToolTip.Tip="{Binding Loc[RoomCard_Status_AutoRecordForThisSessionDisabled_Tooltip]}" />
+                                </StackPanel>
+
+                                <!-- 底部状态条：监控中 / 录制中 + 速度药丸 + 切割按钮 -->
+                                <Grid Grid.Row="3" ColumnDefinitions="Auto,*,Auto" Margin="0,4,0,0">
+                                    <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                                        <Ellipse Width="8" Height="8"
+                                                 Fill="{Binding Recording, Converter={x:Static app:BoolToRecordingBrushConverter.Instance}}"
+                                                 VerticalAlignment="Center" />
+                                        <TextBlock Text="{Binding StatusText}"
+                                                   FontSize="12"
+                                                   Foreground="{Binding Recording, Converter={x:Static app:BoolToRecordingBrushConverter.Instance}}"
+                                                   VerticalAlignment="Center" />
+                                    </StackPanel>
+
+                                    <Border Grid.Column="1"
+                                            HorizontalAlignment="Center"
+                                            CornerRadius="5"
+                                            BorderThickness="1"
+                                            BorderBrush="#55000000"
+                                            Background="#22000000"
+                                            Padding="6,1"
+                                            IsVisible="{Binding Recording}"
+                                            VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Room.Stats.NetworkMbps, StringFormat={}{0:F2} Mbps}"
+                                                   FontSize="11" />
+                                    </Border>
+
+                                    <Button Grid.Column="2"
+                                            Click="SplitButton_Click"
+                                            Content="✂"
+                                            Padding="5,0"
+                                            FontSize="11"
+                                            IsVisible="{Binding Recording}"
+                                            VerticalAlignment="Center"
+                                            ToolTip.Tip="{Binding Loc[RoomCard_SplitButton_Tooltip]}" />
+                                </Grid>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+
+        <!-- 添加房间等操作的错误提示 -->
+        <TextBlock Grid.Row="2"
+                   Margin="0,8,0,0"
+                   Foreground="OrangeRed"
+                   Text="{Binding StatusMessage}"
+                   IsVisible="{Binding StatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+    </Grid>
+</UserControl>

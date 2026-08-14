@@ -1,0 +1,109 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:BililiveRecorder.Desktop.ViewModels"
+        xmlns:v="using:BililiveRecorder.Desktop.Views"
+        xmlns:fav="using:FluentAvalonia.UI.Controls"
+        x:Class="BililiveRecorder.Desktop.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Title="{Binding Title}"
+        Width="1100" Height="700"
+        MinWidth="720" MinHeight="480">
+
+    <fav:NavigationView x:Name="Nav"
+                        OpenPaneLength="220"
+                        IsBackButtonVisible="False"
+                        IsSettingsVisible="False"
+                        SelectionChanged="Nav_OnSelectionChanged">
+        <fav:NavigationView.MenuItems>
+            <fav:NavigationViewItem Tag="rooms"
+                                    Content="{Binding Loc[RootPage_NavigationViewItem_RoomListPage]}"
+                                    IsSelected="True">
+                <fav:NavigationViewItem.IconSource>
+                    <fav:SymbolIconSource Symbol="List" />
+                </fav:NavigationViewItem.IconSource>
+            </fav:NavigationViewItem>
+            <fav:NavigationViewItem x:Name="SettingsNavItem"
+                                    Tag="settings"
+                                    Content="{Binding Loc[RootPage_NavigationViewItem_SettingsPage]}">
+                <fav:NavigationViewItem.IconSource>
+                    <fav:SymbolIconSource Symbol="Setting" />
+                </fav:NavigationViewItem.IconSource>
+            </fav:NavigationViewItem>
+            <fav:NavigationViewItem x:Name="AdvancedNavItem"
+                                    Tag="advanced"
+                                    Content="{Binding Loc[RootPage_NavigationViewItem_AdvancedSettingsPage]}"
+                                    IsVisible="False">
+                <fav:NavigationViewItem.IconSource>
+                    <fav:SymbolIconSource Symbol="Setting" />
+                </fav:NavigationViewItem.IconSource>
+            </fav:NavigationViewItem>
+            <fav:NavigationViewItem x:Name="ToolboxNavItem"
+                                    Tag="toolbox"
+                                    Content="{Binding Loc[Toolbox_Title]}">
+                <fav:NavigationViewItem.IconSource>
+                    <fav:SymbolIconSource Symbol="Repair" />
+                </fav:NavigationViewItem.IconSource>
+                <fav:NavigationViewItem.MenuItems>
+                    <fav:NavigationViewItem Tag="toolbox-autofix" Content="{Binding Loc[Toolbox_AutoFix_Title]}" />
+                    <fav:NavigationViewItem Tag="toolbox-remux" Content="{Binding Loc[Toolbox_Remux_Title]}" />
+                    <fav:NavigationViewItem Tag="toolbox-merger" Content="{Binding Loc[Toolbox_Merge_Title]}" />
+                </fav:NavigationViewItem.MenuItems>
+            </fav:NavigationViewItem>
+            <fav:NavigationViewItem Tag="log"
+                                    Content="{Binding Loc[RootPage_NavigationViewItem_LogPage]}">
+                <fav:NavigationViewItem.IconSource>
+                    <fav:SymbolIconSource Symbol="Document" />
+                </fav:NavigationViewItem.IconSource>
+            </fav:NavigationViewItem>
+            <fav:NavigationViewItem Tag="announcement"
+                                    Content="{Binding Loc[RootPage_NavigationViewItem_AnnouncementPage]}">
+                <fav:NavigationViewItem.IconSource>
+                    <fav:SymbolIconSource Symbol="Important" />
+                </fav:NavigationViewItem.IconSource>
+            </fav:NavigationViewItem>
+            <fav:NavigationViewItem Tag="about"
+                                    Content="关于 / About">
+                <fav:NavigationViewItem.IconSource>
+                    <fav:SymbolIconSource Symbol="Help" />
+                </fav:NavigationViewItem.IconSource>
+            </fav:NavigationViewItem>
+        </fav:NavigationView.MenuItems>
+
+        <fav:NavigationView.PaneFooter>
+            <StackPanel Orientation="Horizontal" Spacing="4" Margin="12,0,12,12">
+                <Button x:Name="ThemeButton" Click="ThemeButton_Click" Content="◐" ToolTip.Tip="切换主题 Toggle theme" />
+                <Button x:Name="LanguageButton" Content="🌐" ToolTip.Tip="切换语言 Language">
+                    <Button.Flyout>
+                        <MenuFlyout x:CompileBindings="False" Placement="Top">
+                            <MenuItem Header="简体中文" Click="Language_Click" Tag="zh-Hans" />
+                            <MenuItem Header="繁體中文" Click="Language_Click" Tag="zh-Hant" />
+                            <MenuItem Header="English" Click="Language_Click" Tag="en" />
+                            <MenuItem Header="日本語" Click="Language_Click" Tag="ja" />
+                        </MenuFlyout>
+                    </Button.Flyout>
+                </Button>
+            </StackPanel>
+        </fav:NavigationView.PaneFooter>
+
+        <Panel Margin="8,4,4,4">
+            <v:RoomListView x:Name="RoomsPanel"
+                            DataContext="{Binding RoomList}" />
+
+            <v:SettingsView x:Name="SettingsPanel"
+                            IsVisible="False"
+                            DataContext="{Binding SettingsVm}" />
+
+            <v:AdvancedSettingsView x:Name="AdvancedSettingsPanel"
+                                    IsVisible="False"
+                                    DataContext="{Binding SettingsVm}" />
+
+            <v:ToolboxAutoFixView x:Name="ToolboxAutoFixPanel" IsVisible="False" />
+            <v:ToolboxRemuxView x:Name="ToolboxRemuxPanel" IsVisible="False" />
+            <v:ToolboxDanmakuMergerView x:Name="ToolboxMergerPanel" IsVisible="False" />
+
+            <v:LogView x:Name="LogPanel" IsVisible="False" />
+            <v:AnnouncementView x:Name="AnnouncementPanel" IsVisible="False" />
+            <v:AboutView x:Name="AboutPanel" IsVisible="False" />
+        </Panel>
+    </fav:NavigationView>
+</Window>
