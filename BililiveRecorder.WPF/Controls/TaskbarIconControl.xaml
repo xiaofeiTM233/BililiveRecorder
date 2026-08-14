@@ -63,14 +63,8 @@
             </Border>
         </Popup>
 
-        <ContextMenu x:Key="TrayContextMenu">
-            <MenuItem x:Name="menuItemShowHide" Header="显示/隐藏" Click="MenuItemShowHide_Click" />
-            <MenuItem x:Name="menuItemStartAll" Header="开始全部录制" Click="MenuItemStartAll_Click" />
-            <MenuItem x:Name="menuItemStopAll" Header="停止全部录制" Click="MenuItemStopAll_Click" />
-            <MenuItem x:Name="menuItemOpenWorkDir" Header="打开工作目录" Click="MenuItemOpenWorkDir_Click" />
-            <Separator />
-            <MenuItem x:Name="menuItemExit" Header="退出" Click="MenuItemExit_Click" />
-        </ContextMenu>
+        <!-- 右键菜单改用 System.Windows.Forms.ContextMenuStrip（在代码后置中构建并挂到 NotifyIcon.ContextMenuStrip），
+             由 WinForms 自动处理“点击外部关闭”，避免 WPF ContextMenu 无法自动消失的问题 -->
     </UserControl.Resources>
 
     <!-- 这个 UserControl 本身不可见，仅作为 NotifyIcon 的承载与生命周期管理 -->

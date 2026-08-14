@@ -13,6 +13,8 @@ using BililiveRecorder.Core.Config.V3;
 using BililiveRecorder.WPF.Models;
 using NotifyIcon = System.Windows.Forms.NotifyIcon;
 using NotifyIconBalloon = System.Windows.Forms.ToolTipIcon;
+using FormsContextMenuStrip = System.Windows.Forms.ContextMenuStrip;
+using FormsToolStripMenuItem = System.Windows.Forms.ToolStripMenuItem;
 
 namespace BililiveRecorder.WPF.Controls
 {
@@ -34,20 +36,20 @@ namespace BililiveRecorder.WPF.Controls
     {
         private readonly NotifyIcon _notifyIcon;
         private readonly Popup _trayToolTipPopup;
-        private readonly DispatcherTimer _toolTipCloseTimer;
+        private readonly FormsContextMenuStrip _contextMenuStrip;
+        private readonly DispatcherTimer _toolTipWatchdog;
+        private DateTime _lastTrayMouseMove = DateTime.MinValue;
         private bool _disposed;
 
         public TaskbarIconControl()
         {
             this.InitializeComponent();
 
-            // 承载富 tooltip 与右键菜单的资源
+            // 承载富 tooltip 的资源
             this._trayToolTipPopup = (Popup)this.FindResource("TrayToolTipPopup");
             this._trayToolTipPopup.PlacementTarget = this;
-            this._trayToolTipPopup.MouseLeave += (s, e) => this.HideTrayToolTip();
 
-            var contextMenu = (ContextMenu)this.FindResource("TrayContextMenu");
-            contextMenu.PlacementTarget = this;
+            this._contextMenuStrip = this.BuildContextMenuStrip();
 
             this._notifyIcon = new NotifyIcon
             {
@@ -55,17 +57,19 @@ namespace BililiveRecorder.WPF.Controls
                 Icon = Icon.ExtractAssociatedIcon(Assembly.GetExecutingAssembly().Location),
                 Text = "BililiveRecorder",
                 Visible = true,
+                ContextMenuStrip = this._contextMenuStrip,
             };
 
             this._notifyIcon.MouseMove += this.NotifyIcon_MouseMove;
             this._notifyIcon.MouseClick += this.NotifyIcon_MouseClick;
             this._notifyIcon.MouseDoubleClick += this.NotifyIcon_MouseDoubleClick;
 
-            this._toolTipCloseTimer = new DispatcherTimer(DispatcherPriority.Background)
+            // Watchdog：WinForms NotifyIcon 的 MouseLeave 不可靠，用轮询判断鼠标是否离开托盘图标
+            this._toolTipWatchdog = new DispatcherTimer(DispatcherPriority.Background)
             {
-                Interval = TimeSpan.FromSeconds(4),
+                Interval = TimeSpan.FromMilliseconds(300),
             };
-            this._toolTipCloseTimer.Tick += (s, e) => this.HideTrayToolTip();
+            this._toolTipWatchdog.Tick += this.ToolTipWatchdog_Tick;
 
             this.Loaded += this.TaskbarIconControl_Loaded;
             this.Unloaded += this.TaskbarIconControl_Unloaded;
@@ -130,22 +134,28 @@ namespace BililiveRecorder.WPF.Controls
         #region 托盘事件
         private void NotifyIcon_MouseMove(object sender, System.Windows.Forms.MouseEventArgs e)
         {
+            this._lastTrayMouseMove = DateTime.Now;
+
             if (this.IsToolTipDisabled())
                 return;
 
-            if (this._trayToolTipPopup.IsOpen)
-                return;
+            if (!this._trayToolTipPopup.IsOpen)
+            {
+                this.ShowTrayToolTipNearCursor();
+            }
 
-            this.ShowTrayToolTipNearCursor();
+            if (!this._toolTipWatchdog.IsEnabled)
+            {
+                this._toolTipWatchdog.Start();
+            }
         }
 
         private void NotifyIcon_MouseClick(object sender, System.Windows.Forms.MouseEventArgs e)
         {
+            // 右键菜单由 NotifyIcon.ContextMenuStrip 自动弹出并自动关闭，无需手动处理
             if (e.Button == System.Windows.Forms.MouseButtons.Right)
             {
                 this.HideTrayToolTip();
-                var contextMenu = (ContextMenu)this.FindResource("TrayContextMenu");
-                contextMenu.IsOpen = true;
             }
         }
 
@@ -155,6 +165,21 @@ namespace BililiveRecorder.WPF.Controls
             {
                 this.HideTrayToolTip();
                 this.ShowHideMainWindow();
+            }
+        }
+        #endregion
+
+        #region tooltip 自动关闭（watchdog 轮询）
+        private void ToolTipWatchdog_Tick(object sender, EventArgs e)
+        {
+            // 鼠标仍在 Popup 内部时不关闭
+            if (this._trayToolTipPopup.IsMouseOver)
+                return;
+
+            // 鼠标离开托盘图标超过 500ms 则关闭 tooltip
+            if (DateTime.Now - this._lastTrayMouseMove > TimeSpan.FromMilliseconds(500))
+            {
+                this.HideTrayToolTip();
             }
         }
         #endregion
@@ -169,18 +194,30 @@ namespace BililiveRecorder.WPF.Controls
             this._trayToolTipPopup.HorizontalOffset = cursorPos.X + 12;
             this._trayToolTipPopup.VerticalOffset = cursorPos.Y + 12;
             this._trayToolTipPopup.IsOpen = true;
-
-            this._toolTipCloseTimer.Stop();
         }
 
         private void HideTrayToolTip()
         {
-            this._toolTipCloseTimer.Stop();
             this._trayToolTipPopup.IsOpen = false;
+            this._toolTipWatchdog.Stop();
         }
         #endregion
 
-        #region 右键菜单与双击
+        #region 右键菜单构建（ContextMenuStrip，WinForms 自动关闭）
+        private FormsContextMenuStrip BuildContextMenuStrip()
+        {
+            var menu = new FormsContextMenuStrip();
+            menu.Items.Add(new FormsToolStripMenuItem("显示/隐藏", (s, e) => this.ShowHideMainWindow()));
+            menu.Items.Add(new FormsToolStripMenuItem("开始全部录制", (s, e) => this.MenuItemStartAll_Click()));
+            menu.Items.Add(new FormsToolStripMenuItem("停止全部录制", (s, e) => this.MenuItemStopAll_Click()));
+            menu.Items.Add(new FormsToolStripMenuItem("打开工作目录", (s, e) => this.MenuItemOpenWorkDir_Click()));
+            menu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
+            menu.Items.Add(new FormsToolStripMenuItem("退出", (s, e) => this.MenuItemExit_Click()));
+            return menu;
+        }
+        #endregion
+
+        #region 菜单动作
         private void ShowHideMainWindow()
         {
             if (!(Application.Current.MainWindow is NewMainWindow nmw))
@@ -196,9 +233,7 @@ namespace BililiveRecorder.WPF.Controls
             }
         }
 
-        private void MenuItemShowHide_Click(object sender, RoutedEventArgs e) => this.ShowHideMainWindow();
-
-        private void MenuItemStartAll_Click(object sender, RoutedEventArgs e)
+        private void MenuItemStartAll_Click()
         {
             if (this.DataContext is RootModel model && model.Recorder != null)
             {
@@ -209,7 +244,7 @@ namespace BililiveRecorder.WPF.Controls
             }
         }
 
-        private void MenuItemStopAll_Click(object sender, RoutedEventArgs e)
+        private void MenuItemStopAll_Click()
         {
             if (this.DataContext is RootModel model && model.Recorder != null)
             {
@@ -220,7 +255,7 @@ namespace BililiveRecorder.WPF.Controls
             }
         }
 
-        private void MenuItemOpenWorkDir_Click(object sender, RoutedEventArgs e)
+        private void MenuItemOpenWorkDir_Click()
         {
             if (this.DataContext is RootModel model && model.Recorder?.Config?.Global != null)
             {
@@ -228,7 +263,7 @@ namespace BililiveRecorder.WPF.Controls
             }
         }
 
-        private void MenuItemExit_Click(object sender, RoutedEventArgs e)
+        private void MenuItemExit_Click()
         {
             // 触发主窗口关闭流程（含退出确认对话框）
             Application.Current.MainWindow?.Close();
@@ -271,13 +306,14 @@ namespace BililiveRecorder.WPF.Controls
                 return;
             this._disposed = true;
 
-            this._toolTipCloseTimer.Stop();
+            this._toolTipWatchdog.Stop();
             this.HideTrayToolTip();
 
             try
             {
                 this._notifyIcon.Visible = false;
                 this._notifyIcon.Dispose();
+                this._contextMenuStrip.Dispose();
             }
             catch
             {
