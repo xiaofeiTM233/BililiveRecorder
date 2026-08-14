@@ -1,35 +1,260 @@
 using System;
+using System.ComponentModel;
+using System.Diagnostics;
+using System.Drawing;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Interop;
+using System.Windows.Controls.Primitives;
+using System.Windows.Input;
 using System.Windows.Threading;
+using BililiveRecorder.Core.Config.V3;
+using BililiveRecorder.WPF.Models;
+using NotifyIcon = System.Windows.Forms.NotifyIcon;
+using NotifyIconBalloon = System.Windows.Forms.ToolTipIcon;
 
 namespace BililiveRecorder.WPF.Controls
 {
-    public partial class TaskbarIconControl : UserControl
+    /// <summary>
+    /// 替代 Hardcodet 的 BalloonIcon，供 ShowBalloonTipCallback 使用。
+    /// </summary>
+    internal enum BalloonIcon
     {
-        private UIElement _originalToolTip;
-        private bool _toolTipResetting;
-        private DateTime _lastTrayMouseMove = DateTime.MinValue;
-        private DispatcherTimer _watchdogTimer;
+        Info,
+        Warning,
+        Error,
+    }
 
-        private const double WatchdogTimeoutSeconds = 1.0;
-        private const int WatchdogIntervalMs = 500;
+    /// <summary>
+    /// 托盘图标控件。使用官方 System.Windows.Forms.NotifyIcon 实现，
+    /// 避免 Hardcodet.NotifyIcon.Wpf 把气泡/tooltip 弹到屏幕左上角的已知 bug。
+    /// </summary>
+    public partial class TaskbarIconControl : UserControl, IDisposable
+    {
+        private readonly NotifyIcon _notifyIcon;
+        private readonly Popup _trayToolTipPopup;
+        private readonly DispatcherTimer _toolTipCloseTimer;
+        private bool _disposed;
 
+        public TaskbarIconControl()
+        {
+            this.InitializeComponent();
+
+            // 承载富 tooltip 与右键菜单的资源
+            this._trayToolTipPopup = (Popup)this.FindResource("TrayToolTipPopup");
+            this._trayToolTipPopup.PlacementTarget = this;
+            this._trayToolTipPopup.MouseLeave += (s, e) => this.HideTrayToolTip();
+
+            var contextMenu = (ContextMenu)this.FindResource("TrayContextMenu");
+            contextMenu.PlacementTarget = this;
+
+            this._notifyIcon = new NotifyIcon
+            {
+                // 从当前 exe 提取图标（WinForms NotifyIcon 需要 System.Drawing.Icon）
+                Icon = Icon.ExtractAssociatedIcon(Assembly.GetExecutingAssembly().Location),
+                Text = "BililiveRecorder",
+                Visible = true,
+            };
+
+            this._notifyIcon.MouseMove += this.NotifyIcon_MouseMove;
+            this._notifyIcon.MouseClick += this.NotifyIcon_MouseClick;
+            this._notifyIcon.MouseDoubleClick += this.NotifyIcon_MouseDoubleClick;
+
+            this._toolTipCloseTimer = new DispatcherTimer(DispatcherPriority.Background)
+            {
+                Interval = TimeSpan.FromSeconds(4),
+            };
+            this._toolTipCloseTimer.Tick += (s, e) => this.HideTrayToolTip();
+
+            this.Loaded += this.TaskbarIconControl_Loaded;
+            this.Unloaded += this.TaskbarIconControl_Unloaded;
+
+            if (Application.Current.MainWindow is NewMainWindow nmw)
+            {
+                nmw.ShowBalloonTipCallback = (title, msg, sym) =>
+                {
+                    // 当关闭托盘提示开关打开时，同时抑制气球提示（开播通知、最小化提示等）
+                    if (this.IsToolTipDisabled())
+                        return;
+
+                    this._notifyIcon.ShowBalloonTip(5000, title, msg, MapBalloonIcon(sym));
+                };
+            }
+        }
+
+        private void TaskbarIconControl_Loaded(object sender, RoutedEventArgs e)
+        {
+            if (this.DataContext is RootModel model)
+            {
+                model.PropertyChanged += this.RootModel_PropertyChanged;
+                if (model.Recorder?.Config?.Global != null)
+                {
+                    model.Recorder.Config.Global.PropertyChanged += this.Global_PropertyChanged;
+                }
+            }
+        }
+
+        private void TaskbarIconControl_Unloaded(object sender, RoutedEventArgs e)
+        {
+            if (this.DataContext is RootModel model)
+            {
+                model.PropertyChanged -= this.RootModel_PropertyChanged;
+                if (model.Recorder?.Config?.Global != null)
+                {
+                    model.Recorder.Config.Global.PropertyChanged -= this.Global_PropertyChanged;
+                }
+            }
+        }
+
+        private void Global_PropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            // 实时响应“关闭托盘图标悬浮提示”开关：开启时立即隐藏并阻止再次显示
+            if (e.PropertyName == nameof(GlobalConfig.WpfDisableTrayToolTip))
+            {
+                if (this.IsToolTipDisabled())
+                {
+                    this.HideTrayToolTip();
+                }
+            }
+        }
+
+        private void RootModel_PropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(RootModel.Recorder) && sender is RootModel model && model.Recorder?.Config?.Global != null)
+            {
+                model.Recorder.Config.Global.PropertyChanged += this.Global_PropertyChanged;
+            }
+        }
+
+        #region 托盘事件
+        private void NotifyIcon_MouseMove(object sender, System.Windows.Forms.MouseEventArgs e)
+        {
+            if (this.IsToolTipDisabled())
+                return;
+
+            if (this._trayToolTipPopup.IsOpen)
+                return;
+
+            this.ShowTrayToolTipNearCursor();
+        }
+
+        private void NotifyIcon_MouseClick(object sender, System.Windows.Forms.MouseEventArgs e)
+        {
+            if (e.Button == System.Windows.Forms.MouseButtons.Right)
+            {
+                this.HideTrayToolTip();
+                var contextMenu = (ContextMenu)this.FindResource("TrayContextMenu");
+                contextMenu.IsOpen = true;
+            }
+        }
+
+        private void NotifyIcon_MouseDoubleClick(object sender, System.Windows.Forms.MouseEventArgs e)
+        {
+            if (e.Button == System.Windows.Forms.MouseButtons.Left)
+            {
+                this.HideTrayToolTip();
+                this.ShowHideMainWindow();
+            }
+        }
+        #endregion
+
+        #region 富 tooltip 显示/隐藏（自绘 Popup，位置跟随鼠标，绝不会跑到左上角）
+        private void ShowTrayToolTipNearCursor()
+        {
+            if (!GetCursorPos(out POINT cursorPos))
+                return;
+
+            // 屏幕坐标直接用于 Placement=Absolute 的 Popup
+            this._trayToolTipPopup.HorizontalOffset = cursorPos.X + 12;
+            this._trayToolTipPopup.VerticalOffset = cursorPos.Y + 12;
+            this._trayToolTipPopup.IsOpen = true;
+
+            this._toolTipCloseTimer.Stop();
+        }
+
+        private void HideTrayToolTip()
+        {
+            this._toolTipCloseTimer.Stop();
+            this._trayToolTipPopup.IsOpen = false;
+        }
+        #endregion
+
+        #region 右键菜单与双击
+        private void ShowHideMainWindow()
+        {
+            if (!(Application.Current.MainWindow is NewMainWindow nmw))
+                return;
+
+            if (nmw.Visibility == Visibility.Visible && nmw.WindowState != WindowState.Minimized)
+            {
+                nmw.Hide();
+            }
+            else
+            {
+                nmw.SuperActivateAction();
+            }
+        }
+
+        private void MenuItemShowHide_Click(object sender, RoutedEventArgs e) => this.ShowHideMainWindow();
+
+        private void MenuItemStartAll_Click(object sender, RoutedEventArgs e)
+        {
+            if (this.DataContext is RootModel model && model.Recorder != null)
+            {
+                foreach (var room in model.Recorder.Rooms)
+                {
+                    room.StartRecord();
+                }
+            }
+        }
+
+        private void MenuItemStopAll_Click(object sender, RoutedEventArgs e)
+        {
+            if (this.DataContext is RootModel model && model.Recorder != null)
+            {
+                foreach (var room in model.Recorder.Rooms)
+                {
+                    room.StopRecord();
+                }
+            }
+        }
+
+        private void MenuItemOpenWorkDir_Click(object sender, RoutedEventArgs e)
+        {
+            if (this.DataContext is RootModel model && model.Recorder?.Config?.Global != null)
+            {
+                Process.Start("explorer.exe", model.Recorder.Config.Global.WorkDirectory);
+            }
+        }
+
+        private void MenuItemExit_Click(object sender, RoutedEventArgs e)
+        {
+            // 触发主窗口关闭流程（含退出确认对话框）
+            Application.Current.MainWindow?.Close();
+        }
+        #endregion
+
+        private bool IsToolTipDisabled()
+        {
+            return this.DataContext is RootModel model
+                && model.Recorder?.Config?.Global?.WpfDisableTrayToolTip == true;
+        }
+
+        private static NotifyIconBalloon MapBalloonIcon(BalloonIcon sym)
+        {
+            return sym switch
+            {
+                BalloonIcon.Warning => NotifyIconBalloon.Warning,
+                BalloonIcon.Error => NotifyIconBalloon.Error,
+                _ => NotifyIconBalloon.Info,
+            };
+        }
+
+        #region Win32 辅助
         [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
         private static extern bool GetCursorPos(out POINT lpPoint);
-
-        [DllImport("user32.dll")]
-        private static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
-
-        [DllImport("user32.dll")]
-        private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter,
-            int X, int Y, int cx, int cy, uint uFlags);
-
-        private const uint SWP_NOSIZE = 0x0001;
-        private const uint SWP_NOZORDER = 0x0004;
-        private const uint SWP_NOACTIVATE = 0x0010;
 
         [StructLayout(LayoutKind.Sequential)]
         private struct POINT
@@ -37,211 +262,28 @@ namespace BililiveRecorder.WPF.Controls
             public int X;
             public int Y;
         }
+        #endregion
 
-        [StructLayout(LayoutKind.Sequential)]
-        private struct RECT
+        #region 释放
+        public void Dispose()
         {
-            public int Left;
-            public int Top;
-            public int Right;
-            public int Bottom;
-        }
-
-        public TaskbarIconControl()
-        {
-            this.InitializeComponent();
-
-            using var iconStream = Application.GetResourceStream(new Uri("pack://application:,,,/BililiveRecorder.WPF;component/ico.ico")).Stream;
-            this.TaskbarIcon.Icon = new System.Drawing.Icon(iconStream);
-
-            this._originalToolTip = this.TaskbarIcon.TrayToolTip;
-
-            if (Application.Current.MainWindow is NewMainWindow nmw)
-            {
-                nmw.ShowBalloonTipCallback = (title, msg, sym) =>
-                {
-                    this.TaskbarIcon.ShowBalloonTip(title, msg, sym);
-                };
-            }
-
-            this.Loaded += OnLoaded;
-        }
-
-        private void OnLoaded(object sender, RoutedEventArgs e)
-        {
-            var window = Application.Current.MainWindow;
-            if (window != null)
-            {
-                window.Activated += OnMainWindowStateChanged;
-                window.Deactivated += OnMainWindowStateChanged;
-                window.LocationChanged += OnMainWindowStateChanged;
-            }
-        }
-
-        private void OnMainWindowStateChanged(object sender, EventArgs e)
-        {
-            ForceCloseToolTip();
-        }
-
-        private void TaskbarIcon_TrayMouseMove(object sender, RoutedEventArgs e)
-        {
-            _lastTrayMouseMove = DateTime.UtcNow;
-        }
-
-        private void TaskbarIcon_PreviewTrayToolTipOpen(object sender, RoutedEventArgs e)
-        {
-            if (IsToolTipDisabled())
+            if (this._disposed)
                 return;
+            this._disposed = true;
 
-            if (this.TaskbarIcon.TrayToolTip == null && this._originalToolTip != null)
-                this.TaskbarIcon.TrayToolTip = this._originalToolTip;
-
-            if (this.TaskbarIcon.TrayToolTip == null)
-                return;
-
-            _lastTrayMouseMove = DateTime.UtcNow;
-
-            this.Dispatcher.BeginInvoke(
-                DispatcherPriority.Background,
-                new Action(FixToolTipPosition));
-
-            StartWatchdog();
-        }
-
-        private void TaskbarIcon_TrayToolTipClose(object sender, RoutedEventArgs e)
-        {
-            StopWatchdog();
-            this.TaskbarIcon.TrayToolTip = null;
-        }
-
-        private void StartWatchdog()
-        {
-            StopWatchdog();
-            _watchdogTimer = new DispatcherTimer(
-                TimeSpan.FromMilliseconds(WatchdogIntervalMs),
-                DispatcherPriority.Background,
-                OnWatchdogTick,
-                this.Dispatcher);
-            _watchdogTimer.Start();
-        }
-
-        private void StopWatchdog()
-        {
-            if (_watchdogTimer != null)
-            {
-                _watchdogTimer.Stop();
-                _watchdogTimer = null;
-            }
-        }
-
-        private void OnWatchdogTick(object sender, EventArgs e)
-        {
-            var tooltip = this.TaskbarIcon.TrayToolTip;
-            if (tooltip == null)
-            {
-                StopWatchdog();
-                return;
-            }
-
-            if (tooltip is UIElement fe && fe.IsMouseOver)
-            {
-                _lastTrayMouseMove = DateTime.UtcNow;
-                return;
-            }
-
-            var elapsed = (DateTime.UtcNow - _lastTrayMouseMove).TotalSeconds;
-            if (elapsed >= WatchdogTimeoutSeconds)
-            {
-                StopWatchdog();
-                ForceCloseToolTip();
-            }
-        }
-
-        private void FixToolTipPosition()
-        {
-            var tooltip = this.TaskbarIcon.TrayToolTip;
-            if (tooltip == null)
-                return;
+            this._toolTipCloseTimer.Stop();
+            this.HideTrayToolTip();
 
             try
             {
-                var source = PresentationSource.FromVisual(tooltip) as HwndSource;
-                if (source == null || source.Handle == IntPtr.Zero)
-                    return;
-
-                if (!GetWindowRect(source.Handle, out RECT rect))
-                    return;
-
-                if (rect.Left > 5 || rect.Top > 5)
-                    return;
-
-                if (!GetCursorPos(out POINT cursorPos))
-                    return;
-
-                SetWindowPos(source.Handle, IntPtr.Zero,
-                    cursorPos.X + 10, cursorPos.Y + 20,
-                    0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+                this._notifyIcon.Visible = false;
+                this._notifyIcon.Dispose();
             }
             catch
             {
+                // ignored
             }
         }
-
-        private void TaskbarIcon_TrayLeftMouseUp(object sender, RoutedEventArgs e)
-        {
-            ForceCloseToolTip();
-            (Application.Current.MainWindow as NewMainWindow)?.SuperActivateAction();
-        }
-
-        private void MenuItem_OpenMainWindow_Click(object sender, RoutedEventArgs e)
-        {
-            (Application.Current.MainWindow as NewMainWindow)?.SuperActivateAction();
-        }
-
-        private void MenuItem_Quit_Click(object sender, RoutedEventArgs e)
-        {
-            (Application.Current.MainWindow as NewMainWindow)?.CloseWithoutConfirmAction();
-        }
-
-        private bool IsToolTipDisabled()
-        {
-            return this.DataContext is Models.RootModel model
-                && model.Recorder?.Config?.Global?.WpfDisableTrayToolTip == true;
-        }
-
-        internal void ForceCloseToolTip()
-        {
-            if (_toolTipResetting || this.TaskbarIcon.TrayToolTip == null)
-                return;
-
-            ForceCloseToolTipUnsafe();
-        }
-
-        private void ForceCloseToolTipUnsafe()
-        {
-            StopWatchdog();
-
-            if (this.TaskbarIcon.TrayToolTip == null)
-                return;
-
-            _toolTipResetting = true;
-
-            try
-            {
-                var popupField = typeof(Hardcodet.Wpf.TaskbarNotification.TaskbarIcon)
-                    .GetField("customToolTipParent", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                var popup = popupField?.GetValue(this.TaskbarIcon) as System.Windows.Controls.Primitives.Popup;
-                if (popup != null)
-                {
-                    popup.PopupAnimation = System.Windows.Controls.Primitives.PopupAnimation.None;
-                    popup.IsOpen = false;
-                }
-            }
-            catch
-            {
-            }
-
-            _toolTipResetting = false;
-        }
+        #endregion
     }
 }
