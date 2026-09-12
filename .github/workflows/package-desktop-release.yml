@@ -44,7 +44,7 @@ jobs:
       contents: read
     steps:
       - name: Download WPF-NupkgReleases artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           name: WPF-NupkgReleases
           path: ./nupkg

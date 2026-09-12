@@ -22,12 +22,12 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           submodules: recursive
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6
 
       - name: Make sure webui can be built
         if: "${{ matrix.os == 'windows-latest' }}"
@@ -47,7 +47,7 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           submodules: recursive
@@ -63,13 +63,13 @@ jobs:
         run: msbuild /nologo /v:m /p:Configuration="Release" BililiveRecorder.WPF/BililiveRecorder.WPF.csproj
 
       - name: Upload Artifacts - Debug
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: WPF-Debug
           path: BililiveRecorder.WPF/bin/Debug
 
       - name: Upload Artifacts - Release
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: WPF-Release
           path: BililiveRecorder.WPF/bin/Release
@@ -84,14 +84,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           submodules: recursive
 
       # 桌面端目标 net10.0，需要显式安装 .NET 10 SDK
       # （仓库 global.json 固定 8.0.100 + rollForward latestMajor）
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '10.0.x'
 
@@ -99,7 +99,7 @@ jobs:
         run: dotnet publish -c Release -r ${{ matrix.rid }} --self-contained true BililiveRecorder.Desktop/src/BililiveRecorder.Desktop/BililiveRecorder.Desktop.csproj
 
       - name: Upload Artifacts - Release
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: Desktop-${{ matrix.rid }}-Release
           path: BililiveRecorder.Desktop/src/BililiveRecorder.Desktop/bin/Release/net10.0/${{ matrix.rid }}/publish
@@ -113,12 +113,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           submodules: recursive
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6
 
       - name: Build WebUI
         run: ./webui/build.sh
@@ -138,12 +138,12 @@ jobs:
         run: dotnet publish -c Release -r ${{ matrix.rid }} BililiveRecorder.Cli/BililiveRecorder.Cli.csproj
 
       - name: Upload Artifacts - Debug
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: CLI-${{ matrix.rid }}-Debug
           path: BililiveRecorder.Cli/publish/${{ matrix.rid }}/Debug
       - name: Upload Artifacts - Release
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: CLI-${{ matrix.rid }}-Release
           path: BililiveRecorder.Cli/publish/${{ matrix.rid }}/Release
@@ -158,17 +158,17 @@ jobs:
       packages: write
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           submodules: recursive
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@v4
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
       - name: Login to GitHub Container Registry
         if: github.event_name != 'pull_request'
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -178,7 +178,7 @@ jobs:
       # https://github.com/docker/metadata-action
       - name: Extract Docker metadata
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
@@ -194,7 +194,7 @@ jobs:
       # Build and push Docker image with Buildx (don't push on PR)
       # https://github.com/docker/build-push-action
       - name: Build and push Docker image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: ./Dockerfile.GitHubActions
