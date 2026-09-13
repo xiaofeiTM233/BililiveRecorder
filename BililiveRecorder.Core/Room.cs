@@ -304,6 +304,8 @@ namespace BililiveRecorder.Core
                         if (!skipFetchRoomInfo)
                             await this.FetchRoomInfoAsync();
 
+                        this.StartDamakuConnection(delay: false);
+
                         await this.recordTask.StartAsync();
                     }
                     catch (NoMatchingQnValueException)
@@ -406,6 +408,13 @@ namespace BililiveRecorder.Core
             {
                 if (this.disposedValue)
                     return;
+
+                if (!this.Recording && !(this.RoomConfig.AutoRecord && this.RoomConfig.RecordDanmakuKeepConnected))
+                {
+                    this.logger.Debug("未开启自动录制且当前未在录制中，跳过连接弹幕服务器");
+                    return;
+                }
+
                 try
                 {
                     if (delay)
@@ -597,6 +606,21 @@ namespace BililiveRecorder.Core
             this.OnPropertyChanged(nameof(this.Recording));
             this.Stats.Reset();
 
+            if (!this.Recording && !(this.RoomConfig.AutoRecord && this.RoomConfig.RecordDanmakuKeepConnected))
+            {
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await this.danmakuClient.DisconnectAsync().ConfigureAwait(false);
+                    }
+                    catch (Exception ex)
+                    {
+                        this.logger.Debug(ex, "断开弹幕服务器连接时出错");
+                    }
+                });
+            }
+
             RecordSessionEnded?.Invoke(this, new RecordSessionEndedEventArgs(this)
             {
                 SessionId = id
@@ -743,9 +767,25 @@ namespace BililiveRecorder.Core
                     {
                         this.AutoRecordForThisSession = true;
 
-                        // 启动录制时更新一次房间信息
                         if (this.Streaming && this.AutoRecordForThisSession)
                             this.CreateAndStartNewRecordTask(skipFetchRoomInfo: false);
+                    }
+                    else
+                    {
+                        if (!this.Recording)
+                        {
+                            _ = Task.Run(async () =>
+                            {
+                                try
+                                {
+                                    await this.danmakuClient.DisconnectAsync().ConfigureAwait(false);
+                                }
+                                catch (Exception ex)
+                                {
+                                    this.logger.Debug(ex, "断开弹幕服务器连接时出错");
+                                }
+                            });
+                        }
                     }
                     break;
                 default:
