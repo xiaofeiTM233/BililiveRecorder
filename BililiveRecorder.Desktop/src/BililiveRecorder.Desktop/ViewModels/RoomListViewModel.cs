@@ -37,6 +37,9 @@ namespace BililiveRecorder.Desktop.ViewModels
 
         public ObservableCollection<RoomListItemViewModel> Rooms { get; } = new ObservableCollection<RoomListItemViewModel>();
 
+        /// <summary>卡片墙数据源：所有房间卡片 + 末尾的“添加房间”占位（与 WPF 版一致的卡片墙）。</summary>
+        public ObservableCollection<object> CardItems { get; } = new ObservableCollection<object>();
+
         [ObservableProperty]
         private string? addRoomInput;
 
@@ -69,6 +72,8 @@ namespace BililiveRecorder.Desktop.ViewModels
 
             // Rooms 集合可能在后台线程变化（弹幕/轮询线程），统一调度到 UI 线程
             ((INotifyCollectionChanged)recorder.Rooms).CollectionChanged += this.Rooms_CollectionChanged;
+
+            this.SyncCardItems();
         }
 
         private void Rooms_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
@@ -95,6 +100,7 @@ namespace BililiveRecorder.Desktop.ViewModels
                         break;
                 }
 
+                this.SyncCardItems();
                 this.ApplySort();
             });
         }
@@ -123,6 +129,15 @@ namespace BililiveRecorder.Desktop.ViewModels
             // 实际删除由视图在显示确认对话框之后调用 RemoveRoom
         }
 
+        /// <summary>重建卡片墙：房间卡片在前，“添加房间”占位固定在最后。</summary>
+        private void SyncCardItems()
+        {
+            this.CardItems.Clear();
+            foreach (var item in this.Rooms)
+                this.CardItems.Add(item);
+            this.CardItems.Add(AddRoomCardMarker.Instance);
+        }
+
         /// <summary>按当前排序方式重排列表。</summary>
         public void ApplySort()
         {
@@ -149,7 +164,10 @@ namespace BililiveRecorder.Desktop.ViewModels
                         break;
                     var index = this.Rooms.IndexOf(ordered[i]);
                     if (index != i && index >= 0)
+                    {
                         this.Rooms.Move(index, i);
+                        this.CardItems.Move(index, i);
+                    }
                 }
             }
             catch (Exception ex)
@@ -271,5 +289,13 @@ namespace BililiveRecorder.Desktop.ViewModels
             foreach (var item in this.Rooms)
                 item.Dispose();
         }
+    }
+
+    /// <summary>卡片墙末尾“添加房间”卡片的占位对象，DataTemplate 按此类型选择模板。</summary>
+    public sealed class AddRoomCardMarker
+    {
+        public static AddRoomCardMarker Instance { get; } = new AddRoomCardMarker();
+
+        private AddRoomCardMarker() { }
     }
 }

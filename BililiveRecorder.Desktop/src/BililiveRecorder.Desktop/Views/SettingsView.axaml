@@ -29,7 +29,8 @@
                                           VerticalAlignment="Center" />
                         </Grid>
                         <Border Classes="settingsDivider" />
-                        <Grid Classes="settingsRow" ColumnDefinitions="*,Auto"
+                        <!-- 行距与房间设置（SettingWithDefault 行内模式）一致：tight = 上下 0 -->
+                        <Grid Classes="settingsRow tight" ColumnDefinitions="*,Auto"
                               IsEnabled="{Binding Config.RecordDanmaku}">
                             <TextBlock Classes="settingsRowTitle"
                                        Text="{Binding Loc[Settings_Danmaku_ToggleSwitch_SuperChat]}"
@@ -39,7 +40,7 @@
                                           IsChecked="{Binding Config.RecordDanmakuSuperChat}"
                                           VerticalAlignment="Center" />
                         </Grid>
-                        <Grid Classes="settingsRow" ColumnDefinitions="*,Auto"
+                        <Grid Classes="settingsRow tight" ColumnDefinitions="*,Auto"
                               IsEnabled="{Binding Config.RecordDanmaku}">
                             <TextBlock Classes="settingsRowTitle"
                                        Text="{Binding Loc[Settings_Danmaku_ToggleSwitch_Guard]}"
@@ -49,7 +50,7 @@
                                           IsChecked="{Binding Config.RecordDanmakuGuard}"
                                           VerticalAlignment="Center" />
                         </Grid>
-                        <Grid Classes="settingsRow" ColumnDefinitions="*,Auto"
+                        <Grid Classes="settingsRow tight" ColumnDefinitions="*,Auto"
                               IsEnabled="{Binding Config.RecordDanmaku}">
                             <TextBlock Classes="settingsRowTitle"
                                        Text="{Binding Loc[Settings_Danmaku_ToggleSwitch_Gift]}"
@@ -59,7 +60,7 @@
                                           IsChecked="{Binding Config.RecordDanmakuGift}"
                                           VerticalAlignment="Center" />
                         </Grid>
-                        <Grid Classes="settingsRow" ColumnDefinitions="*,Auto"
+                        <Grid Classes="settingsRow tight" ColumnDefinitions="*,Auto"
                               IsEnabled="{Binding Config.RecordDanmaku}">
                             <TextBlock Classes="settingsRowTitle"
                                        Text="{Binding Loc[Settings_Danmaku_ToggleSwitch_Raw]}"

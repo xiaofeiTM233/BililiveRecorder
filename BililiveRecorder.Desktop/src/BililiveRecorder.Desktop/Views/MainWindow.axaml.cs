@@ -72,6 +72,12 @@ namespace BililiveRecorder.Desktop.Views
             }
         }
 
+        /// <summary>跳转到设置页（房间卡片菜单的“全局设置”使用）。</summary>
+        internal void NavigateToSettings()
+        {
+            this.Nav.SelectedItem = this.SettingsNavItem;
+        }
+
         private void ToggleAdvancedSettings()
         {
             this.AdvancedNavItem.IsVisible = !this.AdvancedNavItem.IsVisible;

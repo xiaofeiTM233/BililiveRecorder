@@ -8,8 +8,10 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Threading;
+using BililiveRecorder.Desktop.Controls;
 using BililiveRecorder.Desktop.ViewModels;
 using FluentAvalonia.UI.Controls;
 using Serilog;
@@ -100,30 +102,47 @@ namespace BililiveRecorder.Desktop.Views
             var flyout = new MenuFlyout();
             var items = flyout.Items;
 
-            void Add(string key, ICommand? command)
-                => items.Add(new MenuItem { Header = loc[key], Command = command });
+            void AddWithIcon(string key, ICommand? command, StreamGeometry icon, IBrush? fill = null)
+                => items.Add(this.CreateMenuItem(loc[key], command, icon, fill));
 
+            // 菜单结构与 WPF 版卡片菜单一致（每项带图标）
             if (item.Recording)
-                Add("RoomCard_Menu_StopRecording", item.StopRecordCommand);
+                AddWithIcon("RoomCard_Menu_StopRecording", item.StopRecordCommand, RoomCardIcons.StopCircleOutline);
             else
-                Add("RoomCard_Menu_StartRecording", item.StartRecordCommand);
+                AddWithIcon("RoomCard_Menu_StartRecording", item.StartRecordCommand, RoomCardIcons.PlayCircleOutline);
 
             items.Add(new Separator());
 
-            if (item.AutoRecord)
-                Add("RoomCard_Menu_DisableAutoRecord", item.DisableAutoRecordCommand);
-            else
-                Add("RoomCard_Menu_EnableAutoRecord", item.EnableAutoRecordCommand);
-
-            Add("RoomCard_Menu_RefreshInfo", item.RefreshCommand);
-            Add("RoomCard_Menu_OpenInBrowser", item.OpenInBrowserCommand);
+            AddWithIcon("RoomCard_Menu_RefreshInfo", item.RefreshCommand, RoomCardIcons.Refresh);
+            AddWithIcon("RoomCard_Menu_OpenInBrowser", item.OpenInBrowserCommand, RoomCardIcons.OpenInNew);
 
             items.Add(new Separator());
-            Add("RoomCard_Menu_Settings", item.ShowSettingsCommand);
+            AddWithIcon("RoomCard_Menu_Settings", item.ShowSettingsCommand, RoomCardIcons.CogOutline);
+
+            // “全局设置”跳转到主窗口设置页（WPF 版此项同样未本地化）
+            var globalSettingsItem = this.CreateMenuItem("全局设置", null, RoomCardIcons.CogOutline);
+            globalSettingsItem.Click += (_, _) => App.MainWindowOrNull?.NavigateToSettings();
+            items.Add(globalSettingsItem);
 
             items.Add(new Separator());
-            Add("Global_Copy", item.CopyRoomIdCommand);
-            Add("RoomCard_Menu_Delete", item.RemoveCommand);
+
+            // 单选样式（同 WPF 版 RadioMenuItem）：选中的项前显示小圆点，无其他图标
+            items.Add(new MenuItem
+            {
+                Header = loc["RoomCard_Menu_EnableAutoRecord"],
+                Command = item.EnableAutoRecordCommand,
+                Icon = this.BuildAutoRecordMenuIcon(item.AutoRecord),
+            });
+            items.Add(new MenuItem
+            {
+                Header = loc["RoomCard_Menu_DisableAutoRecord"],
+                Command = item.DisableAutoRecordCommand,
+                Icon = this.BuildAutoRecordMenuIcon(!item.AutoRecord),
+            });
+
+            items.Add(new Separator());
+            AddWithIcon("Global_Copy", item.CopyRoomIdCommand, RoomCardIcons.ContentCopy);
+            AddWithIcon("RoomCard_Menu_Delete", item.RemoveCommand, RoomCardIcons.Delete, Brushes.DarkRed);
 
             try
             {
@@ -140,6 +159,63 @@ namespace BililiveRecorder.Desktop.Views
         {
             if ((sender as Control)?.DataContext is RoomListItemViewModel item)
                 item.Room.SplitOutput();
+        }
+
+        /// <summary>创建带图标的菜单项（图标与 WPF 版一致，使用矢量路径）。</summary>
+        private MenuItem CreateMenuItem(string header, ICommand? command, StreamGeometry icon, IBrush? fill = null)
+        {
+            return new MenuItem
+            {
+                Header = header,
+                Command = command,
+                Icon = new Avalonia.Controls.Shapes.Path
+                {
+                    Data = icon,
+                    Width = 16,
+                    Height = 16,
+                    Stretch = Stretch.Uniform,
+                    Fill = fill ?? this.DefaultIconFill(),
+                },
+            };
+        }
+
+        private IBrush DefaultIconFill()
+        {
+            if (this.TryFindResource("SystemControlForegroundBaseHighBrush", out var value) && value is IBrush brush)
+                return brush;
+            return Brushes.Gray;
+        }
+
+        /// <summary>
+        /// 构建“自动录制/不自动录制”菜单项图标：仅选中的项前显示一个小圆点，无其他图标。
+        /// 固定 9 宽保证两项文字对齐。
+        /// </summary>
+        private Grid BuildAutoRecordMenuIcon(bool isSelected)
+        {
+            var grid = new Grid { Width = 9 };
+
+            var dot = new Avalonia.Controls.Shapes.Ellipse
+            {
+                Width = 6,
+                Height = 6,
+                Fill = this.DefaultIconFill(),
+                VerticalAlignment = VerticalAlignment.Center,
+                IsVisible = isSelected,
+            };
+            grid.Children.Add(dot);
+
+            return grid;
+        }
+
+        /// <summary>“添加房间”卡片：输入框内按回车等同点击“确定”。</summary>
+        private void AddCardInput_KeyDown(object? sender, KeyEventArgs e)
+        {
+            if (e.Key != Key.Enter)
+                return;
+
+            e.Handled = true;
+            if (this.ViewModel is { } vm)
+                vm.AddRoomCommand.Execute(null);
         }
 
 #pragma warning disable VSTHRD100 // Avoid async void methods

@@ -1,6 +1,7 @@
 using System;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Text;
 using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
@@ -35,6 +36,7 @@ namespace BililiveRecorder.Desktop.ViewModels
             this.loc = loc ?? throw new ArgumentNullException(nameof(loc));
             this.uiSettings = uiSettings ?? throw new ArgumentNullException(nameof(uiSettings));
             room.PropertyChanged += this.Room_PropertyChanged;
+            room.Stats.PropertyChanged += this.RoomStats_PropertyChanged;
         }
 
         public int RoomId => this.Room.RoomConfig.RoomId;
@@ -55,7 +57,7 @@ namespace BililiveRecorder.Desktop.ViewModels
                 var child = this.Room.AreaNameChild;
                 if (string.IsNullOrWhiteSpace(parent))
                     return string.Empty;
-                return string.IsNullOrWhiteSpace(child) ? parent : $"{parent}/{child}";
+                return string.IsNullOrWhiteSpace(child) ? parent : $"{parent} · {child}";
             }
         }
 
@@ -68,11 +70,62 @@ namespace BililiveRecorder.Desktop.ViewModels
         public bool AutoRecord
         {
             get => this.Room.RoomConfig.AutoRecord;
-            set => this.Room.RoomConfig.AutoRecord = value;
+            set
+            {
+                this.Room.RoomConfig.AutoRecord = value;
+                this.OnPropertyChanged();
+                this.OnPropertyChanged(nameof(this.ShowMonitoring));
+            }
         }
 
         /// <summary>本次会话是否允许自动录制（用户手动停止后为 false，卡片上显示橙色提示）。</summary>
         public bool AutoRecordForThisSession => this.Room.AutoRecordForThisSession;
+
+        public bool HasShortId => this.ShortId != 0;
+
+        /// <summary>未录制且开启了自动录制时显示“监控中”（与 WPF 版一致）。</summary>
+        public bool ShowMonitoring => !this.Recording && this.AutoRecord;
+
+        /// <summary>速度药丸文本，如 "12.34 Mbps"。</summary>
+        public string SpeedText => string.Format(this.loc["RoomCard_Status_SpeedIndicator_SpeedInMbps"], this.Room.Stats.NetworkMbps);
+
+        /// <summary>速度药丸的悬浮提示与点击详情（直播服务器、速度比、时长、数据量）。</summary>
+        public string StatsTooltipText
+        {
+            get
+            {
+                var stats = this.Room.Stats;
+                if (double.IsNaN(stats.DurationRatio))
+                    return this.loc["RoomCard_Status_SpeedIndicator_NoData"];
+
+                var sb = new StringBuilder();
+                if (!string.IsNullOrEmpty(stats.StreamHost))
+                    sb.Append("直播服务器: ").AppendLine(stats.StreamHost);
+                sb.AppendLine(string.Format(this.loc["RoomCard_Status_SpeedIndicator_SpeedInPercentage"], stats.DurationRatio));
+                sb.AppendLine(string.Format(this.loc["RoomCard_Status_SpeedIndicator_CurrentFileDuration"], stats.FileMaxTimestamp));
+                sb.AppendLine(string.Format(this.loc["RoomCard_Status_SpeedIndicator_TotalFileDuration"], stats.SessionMaxTimestamp));
+                sb.AppendLine(string.Format(this.loc["RoomCard_Status_SpeedIndicator_SessionDuration"], stats.SessionDuration));
+                sb.AppendLine(string.Format(this.loc["RoomCard_Status_SpeedIndicator_TotalnputBytes"], FormatBytes(stats.TotalInputBytes)));
+                sb.Append(string.Format(this.loc["RoomCard_Status_SpeedIndicator_TotalOutputBytes"], FormatBytes(stats.TotalOutputBytes)));
+                return sb.ToString();
+            }
+        }
+
+        private static string FormatBytes(long bytes)
+        {
+            const long KiB = 1024;
+            const long MiB = KiB * 1024;
+            const long GiB = MiB * 1024;
+            const long TiB = GiB * 1024;
+            return bytes switch
+            {
+                < KiB => $"{bytes} Bytes",
+                < MiB => $"{bytes / (double)KiB:F2} KiB",
+                < GiB => $"{bytes / (double)MiB:F2} MiB",
+                < TiB => $"{bytes / (double)GiB:F2} GiB",
+                _ => $"{bytes / (double)TiB:F2} TiB",
+            };
+        }
 
         public string StatusText => this.Recording
             ? this.loc["RoomCard_Status_Recording"]
@@ -155,10 +208,28 @@ namespace BililiveRecorder.Desktop.ViewModels
             }
         }
 
+        private void RoomStats_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            // 统计数据可能在后台线程更新，调度到 UI 线程刷新速度显示
+            if (Dispatcher.UIThread.CheckAccess())
+                this.OnStatsPropertyChanged();
+            else
+                Dispatcher.UIThread.Post(this.OnStatsPropertyChanged);
+        }
+
+        private void OnStatsPropertyChanged()
+        {
+            if (this.disposed)
+                return;
+            this.OnPropertyChanged(nameof(this.SpeedText));
+            this.OnPropertyChanged(nameof(this.StatsTooltipText));
+        }
+
         public void Dispose()
         {
             this.disposed = true;
             this.Room.PropertyChanged -= this.Room_PropertyChanged;
+            this.Room.Stats.PropertyChanged -= this.RoomStats_PropertyChanged;
         }
     }
 }
