@@ -10,6 +10,8 @@
         MinWidth="720" MinHeight="480">
 
     <fav:NavigationView x:Name="Nav"
+                        PaneDisplayMode="LeftCompact"
+                        IsPaneOpen="False"
                         OpenPaneLength="220"
                         IsBackButtonVisible="False"
                         IsSettingsVisible="False"
@@ -62,27 +64,39 @@
                 </fav:NavigationViewItem.IconSource>
             </fav:NavigationViewItem>
             <fav:NavigationViewItem Tag="about"
-                                    Content="关于 / About">
+                                    Content="关于">
                 <fav:NavigationViewItem.IconSource>
                     <fav:SymbolIconSource Symbol="Help" />
                 </fav:NavigationViewItem.IconSource>
             </fav:NavigationViewItem>
         </fav:NavigationView.MenuItems>
 
+        <!-- 主题/语言按钮：竖排在底部；固定 48 宽让按钮与导航图标同轴居中（收缩/展开都对齐） -->
         <fav:NavigationView.PaneFooter>
-            <StackPanel Orientation="Horizontal" Spacing="4" Margin="12,0,12,12">
-                <Button x:Name="ThemeButton" Click="ThemeButton_Click" Content="◐" ToolTip.Tip="切换主题 Toggle theme" />
-                <Button x:Name="LanguageButton" Content="🌐" ToolTip.Tip="切换语言 Language">
-                    <Button.Flyout>
-                        <MenuFlyout x:CompileBindings="False" Placement="Top">
-                            <MenuItem Header="简体中文" Click="Language_Click" Tag="zh-Hans" />
-                            <MenuItem Header="繁體中文" Click="Language_Click" Tag="zh-Hant" />
-                            <MenuItem Header="English" Click="Language_Click" Tag="en" />
-                            <MenuItem Header="日本語" Click="Language_Click" Tag="ja" />
-                        </MenuFlyout>
-                    </Button.Flyout>
-                </Button>
-            </StackPanel>
+            <Grid Width="48" HorizontalAlignment="Left" Margin="0,0,0,12">
+                <StackPanel Orientation="Vertical" Spacing="6" HorizontalAlignment="Center">
+                    <Button x:Name="ThemeButton"
+                            Width="40" Height="40" Padding="0" HorizontalAlignment="Center"
+                            HorizontalContentAlignment="Center" VerticalContentAlignment="Center" FontSize="16"
+                            Click="ThemeButton_Click" Content="◐" ToolTip.Tip="切换主题 Toggle theme" />
+                    <Button x:Name="LanguageButton"
+                            Width="40" Height="40" Padding="0" HorizontalAlignment="Center"
+                            HorizontalContentAlignment="Center" VerticalContentAlignment="Center" FontSize="16"
+                            ToolTip.Tip="切换语言 Language">
+                        <!-- 与导航图标同字体的 Globe 字形，避免 emoji 字形偏移 -->
+                        <TextBlock FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                                   Text="&#xE774;" FontSize="16" />
+                        <Button.Flyout>
+                            <MenuFlyout x:CompileBindings="False" Placement="Top">
+                                <MenuItem Header="简体中文" Click="Language_Click" Tag="zh-Hans" />
+                                <MenuItem Header="繁體中文" Click="Language_Click" Tag="zh-Hant" />
+                                <MenuItem Header="English" Click="Language_Click" Tag="en" />
+                                <MenuItem Header="日本語" Click="Language_Click" Tag="ja" />
+                            </MenuFlyout>
+                        </Button.Flyout>
+                    </Button>
+                </StackPanel>
+            </Grid>
         </fav:NavigationView.PaneFooter>
 
         <Panel Margin="8,4,4,4">

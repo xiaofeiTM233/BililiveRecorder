@@ -39,7 +39,7 @@
                                                 IsInlineContent="True">
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <TextBox Text="{Binding Config.RecordDanmakuFlushInterval}" Width="120" />
-                                <TextBlock Text="ms" VerticalAlignment="Center" Opacity="0.7" />
+                                <TextBlock Text="个" VerticalAlignment="Center" Opacity="0.7" />
                             </StackPanel>
                         </ctl:SettingWithDefault>
                         <Border Classes="settingsDivider" />

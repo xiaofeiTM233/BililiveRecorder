@@ -207,13 +207,13 @@ namespace BililiveRecorder.Desktop
 
             menu.Items.Add(new NativeMenuItemSeparator());
 
-            AddItem(LocalizationService.Instance["RoomCard_Menu_StartRecording"], (s, e) =>
+            AddItem("全部" + LocalizationService.Instance["RoomCard_Menu_StartRecording"], (s, e) =>
             {
                 foreach (var room in recorder.Rooms)
                     if (room.Streaming && !room.Recording)
                         room.StartRecord();
             });
-            AddItem(LocalizationService.Instance["RoomCard_Menu_StopRecording"], (s, e) =>
+            AddItem("全部" + LocalizationService.Instance["RoomCard_Menu_StopRecording"], (s, e) =>
             {
                 foreach (var room in recorder.Rooms)
                     if (room.Recording)
