@@ -3,9 +3,11 @@ using System.Runtime.Serialization;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Data;
 using BililiveRecorder.Core.Api;
 using BililiveRecorder.Core.Scripting;
+using BililiveRecorder.WPF.Controls;
 using Newtonsoft.Json.Linq;
 using Serilog;
 
